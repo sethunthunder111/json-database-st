@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSONDatabase.js - Documentation</title>
+    <!-- Google Fonts - Roboto -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Prism.js CSS (Okaidia Theme) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
+    <style>
+        /* Basic Reset & Material Font */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            font-size: 16px; /* Base font size */
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            min-height: 100vh;
+            display: flex; /* Use flex for sidebar layout */
+            flex-direction: column; /* Keep header/footer flow */
+        }
+
+        /* --- Sidebar --- */
+        #sidebar {
+            width: 240px;
+            background-color: #ffffff;
+            border-right: 1px solid #e0e0e0;
+            padding: 20px 0;
+            height: 100vh; /* Full height */
+            position: fixed; /* Fixed position */
+            top: 0;
+            left: 0;
+            z-index: 1000;
+            overflow-y: auto; /* Scroll if content overflows */
+            transition: left 0.3s ease-in-out; /* Animation for mobile */
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+
+        #sidebar h3 {
+            padding: 10px 20px;
+            font-size: 1.1em;
+            color: #3f51b5; /* Indigo */
+            border-bottom: 1px solid #eee;
+            margin-bottom: 10px;
+        }
+
+        #sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #sidebar li a {
+            display: block;
+            padding: 10px 20px;
+            color: #424242; /* Darker grey */
+            text-decoration: none;
+            font-size: 0.95em;
+            transition: background-color 0.2s ease, color 0.2s ease;
+            border-left: 3px solid transparent; /* For active indication */
+        }
+
+        #sidebar li a:hover {
+            background-color: #f5f5f5; /* Light grey hover */
+            color: #3f51b5;
+        }
+         /* Style for nested API links */
+         #sidebar ul ul {
+            margin-left: 15px; /* Indent nested list */
+         }
+         #sidebar ul ul a {
+            padding-left: 30px; /* Increase padding for nested links */
+            font-size: 0.9em;
+            color: #616161; /* Slightly lighter color */
+         }
+         #sidebar ul ul a:hover {
+             background-color: #e8eaf6; /* Indigo light */
+         }
+
+
+        /* --- Header --- */
+        header {
+            background-color: #3f51b5; /* Indigo */
+            color: #fff;
+            padding: 15px 0; /* Adjusted padding */
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: sticky; /* Make header sticky */
+            top: 0;
+            z-index: 999; /* Below sidebar */
+            width: 100%; /* Full width needed for sticky */
+            display: flex; /* Use flex for alignment */
+            align-items: center;
+            justify-content: center; /* Center title by default */
+        }
+
+        /* --- Menu Toggle Button (Hamburger) --- */
+        #menu-toggle {
+            display: none; /* Hidden by default on larger screens */
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px 15px;
+            position: absolute; /* Position relative to header */
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        header h1 {
+            margin: 0;
+            font-weight: 500;
+            font-size: 1.6em; /* Slightly smaller */
+        }
+        /* Remove the subtitle from header, maybe place elsewhere or omit */
+        /* header p { font-weight: 300; opacity: 0.9; margin-top: 5px; } */
+
+
+        /* --- Main Content Area --- */
+        .content-wrapper {
+             display: flex; /* Use flex for sidebar + main */
+             flex-grow: 1;
+         }
+
+        main {
+            flex-grow: 1; /* Takes remaining space */
+            padding: 30px 20px 30px 260px; /* Add left padding equal to sidebar width + margin */
+            width: 100%; /* Ensure it tries to take full width initially */
+            transition: padding-left 0.3s ease-in-out; /* Match sidebar animation */
+        }
+
+        /* Container inside main */
+        .container {
+            max-width: 900px; /* Adjusted max-width */
+            margin: 0 auto;
+            width: 100%; /* Take full width of the main area */
+        }
+
+        /* Cards for Sections */
+        .card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+            margin-bottom: 25px;
+            padding: 25px;
+            overflow: hidden; /* Contains floats and prevents margin collapse */
+        }
+
+        .card h2, .card h3 {
+            color: #3f51b5; /* Indigo */
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #eee;
+        }
+         .card h2 {
+            scroll-margin-top: 80px; /* Offset for sticky header */
+         }
+         .card h3 {
+            color: #5c6bc0; /* Lighter Indigo */
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+             scroll-margin-top: 80px; /* Offset for sticky header */
+         }
+
+        /* Code Blocks */
+        pre[class*="language-"] {
+            padding: 1em;
+            margin: 1.5em 0;
+            overflow: auto;
+            border-radius: 6px;
+            background-color: #272822; /* Okaidia background */
+            font-size: 0.95em;
+        }
+
+        code[class*="language-"] {
+            font-family: 'Consolas', 'Monaco', 'Andale Mono', 'Ubuntu Mono', monospace;
+            font-size: 0.95em;
+        }
+
+        /* Inline Code */
+        :not(pre) > code {
+            background-color: #e8eaf6; /* Indigo light */
+            color: #3f51b5;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        /* Parameters & Properties Lists */
+        ul.params, ul.props { list-style: none; margin-left: 10px; margin-bottom: 15px; }
+        ul.params li, ul.props li { margin-bottom: 10px; padding-left: 20px; position: relative; }
+        ul.params li::before, ul.props li::before { content: '•'; position: absolute; left: 0; color: #3f51b5; font-weight: bold; }
+        ul.params code, ul.props code { font-weight: 500; }
+        .param-type, .prop-type { font-style: italic; color: #757575; margin-left: 5px; }
+        .optional { color: #ff9800; font-size: 0.85em; margin-left: 5px; }
+
+        /* Notes & Considerations */
+        .note { background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 15px 0; border-radius: 4px; }
+        .note strong { color: #1e88e5; }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: auto; /* Pushes footer down */
+            background-color: #e0e0e0;
+            color: #616161;
+            font-size: 0.9em;
+            /* Adjust footer based on sidebar visibility */
+            padding-left: 240px; /* Default for desktop */
+            transition: padding-left 0.3s ease-in-out;
+        }
+
+
+        /* --- Responsive Design --- */
+        @media (max-width: 992px) { /* Adjust breakpoint as needed */
+            #sidebar {
+                left: -250px; /* Hidden off-screen */
+                box-shadow: 4px 0 6px rgba(0,0,0,0.1); /* Shadow when open */
+                 height: 100%; /* Ensure full height */
+                 position: fixed; /* Ensure it's fixed */
+                 top: 0;
+            }
+
+            main {
+                padding-left: 20px; /* Reset padding */
+            }
+
+            #menu-toggle {
+                display: block; /* Show hamburger button */
+            }
+
+             header {
+                 justify-content: center; /* Keep title centered on mobile */
+                 padding-left: 50px; /* Make space for hamburger */
+                 padding-right: 50px; /* Balance padding */
+             }
+             header h1 {
+                 font-size: 1.4em;
+             }
+
+            footer {
+                padding-left: 0; /* Reset footer padding */
+            }
+
+            /* When sidebar is open on mobile */
+            body.sidebar-open #sidebar {
+                left: 0;
+            }
+             /* Optional: Dim the main content when sidebar is open on mobile */
+            body.sidebar-open::after {
+                 content: '';
+                 position: fixed;
+                 top: 0;
+                 left: 0;
+                 right: 0;
+                 bottom: 0;
+                 background-color: rgba(0, 0, 0, 0.4);
+                 z-index: 999; /* Below sidebar, above content */
+             }
+            body.sidebar-open main, body.sidebar-open footer {
+                 /* Prevent interaction with main content when sidebar is open */
+                 /* pointer-events: none; */ /* This can be too aggressive */
+            }
+        }
+
+
+        @media (max-width: 768px) {
+            .container {
+                width: 100%; /* Use full width within main padding */
+            }
+            .card {
+                padding: 20px;
+            }
+            pre[class*="language-"] {
+                font-size: 0.9em;
+            }
+            .card h2, .card h3 {
+                 scroll-margin-top: 70px; /* Adjust scroll offset for smaller header */
+            }
+        }
+
+        @media (max-width: 480px) {
+            html {
+                font-size: 15px;
+            }
+             header h1 {
+                 font-size: 1.2em;
+             }
+            .card {
+                padding: 15px;
+            }
+             pre[class*="language-"] {
+                font-size: 0.85em;
+             }
+             ul.params li, ul.props li {
+                 padding-left: 15px;
+             }
+             ul.params li::before, ul.props li::before {
+                left: -5px;
+             }
+        }
+
+    </style>
+</head>
+<body>
+
+    <aside id="sidebar">
+        <h3>Navigation</h3>
+        <ul>
+            <li><a href="#intro">Introduction</a></li>
+            <li><a href="#getting-started">Getting Started</a></li>
+            <li><a href="#core-concepts">Core Concepts</a></li>
+            <li>
+                <a href="#api">API Reference</a>
+                <ul> <!-- Nested list for API methods -->
+                    <li><a href="#api-constructor">Constructor</a></li>
+                    <li><a href="#api-get">get()</a></li>
+                    <li><a href="#api-set">set()</a></li>
+                    <li><a href="#api-push">push()</a></li>
+                    <li><a href="#api-pull">pull()</a></li>
+                    <li><a href="#api-delete">delete()</a></li>
+                    <li><a href="#api-has">has()</a></li>
+                    <li><a href="#api-transaction">transaction()</a></li>
+                    <li><a href="#api-batch">batch()</a></li>
+                    <li><a href="#api-query">query()</a></li>
+                    <li><a href="#api-close">close()</a></li>
+                </ul>
+            </li>
+            <li><a href="#properties">Properties</a></li>
+        </ul>
+    </aside>
+
+    <div class="content-wrapper">
+        <header>
+            <button id="menu-toggle" aria-label="Toggle Menu">&#9776;</button> <!-- Hamburger Icon -->
+            <h1>JSONDatabase.js</h1>
+            <!-- Subtitle removed from header -->
+        </header>
+
+        <main>
+            <div class="container">
+
+                <!-- Introduction Card -->
+                <section id="intro" class="card">
+                    <h2>Introduction</h2>
+                     <p> <!-- Added subtitle back here -->
+                         Ultra-fast JSON database with atomic operations, transactions, and query engine.
+                     </p>
+                     <p>
+                        <code>JSONDatabase.js</code> provides a simple yet powerful interface for managing data stored in a single JSON file on your local filesystem. It's designed for Node.js environments and offers features like:
+                    </p>
+                    <ul>
+                        <li><strong>Atomic Operations:</strong> Ensures that write operations (set, push, pull, delete, transaction, batch) are performed indivisibly, preventing data corruption from concurrent writes.</li>
+                        <li><strong>Caching:</strong> Keeps the database content in memory for faster reads after the initial load.</li>
+                        <li><strong>Transactions:</strong> Allows multiple operations to be performed as a single, atomic unit.</li>
+                        <li><strong>Batching:</strong> Efficiently performs multiple write operations together.</li>
+                        <li><strong>Querying:</strong> Basic filtering capabilities for your data.</li>
+                        <li><strong>Simplicity:</strong> Uses lodash for robust data manipulation via dot notation paths.</li>
+                    </ul>
+
+                    <h3>Dependencies</h3>
+                    <p>This module requires:</p>
+                    <ul>
+                        <li>Node.js (with `fs.promises` support)</li>
+                        <li><a href="https://lodash.com/" target="_blank" rel="noopener">lodash</a> library</li>
+                    </ul>
+
+                    <h3>Installation</h3>
+                    <p>First, install lodash if you haven't already:</p>
+                    <pre><code class="language-bash">npm install lodash</code></pre>
+                    <p>Then, save the <code>JSONDatabase.js</code> file in your project and require it.</p>
+                </section>
+
+                <!-- Getting Started Card -->
+                <section id="getting-started" class="card">
+                    <h2>Getting Started</h2>
+                    <p>Here's a basic example of how to use the database:</p>
+                    <pre><code class="language-javascript">// main.js
+const JSONDatabase = require('./JSONDatabase.js'); // Adjust path if needed
+const path = require('path');
+
+// Create or load a database file named 'my_database.json' in a 'data' subdirectory
+const db = new JSONDatabase(path.join(__dirname, 'data', 'my_database')); // .json is added automatically
+
+async function main() {
+    try {
+        console.log('Database initialized at:', db.filename);
+
+        // Set some initial data
+        await db.set('user.name', 'Alice');
+        await db.set('user.age', 30);
+        await db.set('products', []); // Initialize an empty array
+
+        console.log('Set initial data.');
+
+        // Push items to the products array (only unique items are added)
+        await db.push('products', 'apple', 'banana');
+        await db.push('products', 'orange', 'apple'); // 'apple' won't be added again
+
+        // Get data
+        const userName = await db.get('user.name');
+        const products = await db.get('products');
+        const userAge = await db.get('user.age', 25); // Get age, default to 25 if not found
+        const nonExistent = await db.get('user.address', 'N/A'); // Default value example
+
+        console.log(`User Name: ${userName}`); // Output: User Name: Alice
+        console.log(`User Age: ${userAge}`);   // Output: User Age: 30
+        console.log(`Products: ${products.join(', ')}`); // Output: Products: apple, banana, orange
+        console.log(`Address: ${nonExistent}`); // Output: Address: N/A
+
+        // Check if data exists
+        const hasAge = await db.has('user.age');
+        const hasCity = await db.has('user.city');
+        console.log(`Has age? ${hasAge}`); // Output: Has age? true
+        console.log(`Has city? ${hasCity}`); // Output: Has city? false
+
+        // Delete data
+        const deletedAge = await db.delete('user.age');
+        console.log(`Was age deleted? ${deletedAge}`); // Output: Was age deleted? true
+        console.log(`User data after delete:`, await db.get('user')); // Output: { name: 'Alice' }
+
+    } catch (error) {
+        console.error("An error occurred:", error);
+    } finally {
+        // Important: Close the database when done to ensure all writes are finished
+        await db.close();
+        console.log('Database closed.');
+    }
+}
+
+main();
+</code></pre>
+                </section>
+
+                 <!-- Core Concepts Card -->
+                <section id="core-concepts" class="card">
+                    <h2>Core Concepts</h2>
+                    <h3>Atomicity & Locking</h3>
+                    <p>
+                        All write operations (`set`, `push`, `pull`, `delete`, `transaction`, `batch`) are designed to be atomic. This is achieved using an internal locking mechanism (`_atomicWrite`). When a write operation starts, it acquires a lock. Subsequent write attempts will wait until the current operation completes (reads the file, modifies data in memory, writes back to the file, updates the cache) before proceeding. This prevents race conditions where multiple writes might interfere with each other and corrupt the JSON file.
+                    </p>
+                    <div class="note">
+                        <strong>Note:</strong> While atomic, high contention (many simultaneous write attempts) can lead to delays as operations queue up waiting for the lock.
+                    </div>
+
+                    <h3>Caching</h3>
+                    <p>
+                        The database maintains an in-memory cache (`this.cache`) of the entire JSON file's content.
+                    </p>
+                    <ul>
+                        <li>On initialization (`constructor` calls `_init`), the database attempts to read the file into the cache. If the file doesn't exist, it creates an empty one (`{}`).</li>
+                        <li>Read operations (`get`, `has`, `query`) primarily use this cache for speed (`this.stats.hits`). If the cache is empty (e.g., immediately after construction before `_init` finishes or after `close`), they will trigger a cache refresh (`_refreshCache`) which reads from the file (`this.stats.reads`).</li>
+                        <li>Write operations (`set`, `push`, etc.) modify a *copy* of the cached data, write the *entire* modified data back to the file atomically, and *then* update the in-memory cache with the new state.</li>
+                    </ul>
+                     <div class="note">
+                        <strong>Note:</strong> The cache reflects the state after the *last successful write operation* completed by *this specific instance* of the database. If the JSON file is modified externally (by another process or manually), this instance won't know until the next file read (which typically only happens during initialization or if the cache was somehow cleared). Use `_refreshCache()` manually *only if you are certain* you need to force a reload from disk, but be aware this bypasses normal locking. It's generally safer to rely on the atomic write mechanism.
+                    </div>
+
+                     <h3>Error Handling</h3>
+                     <p>
+                         Most methods are `async` and return Promises. Errors during file operations (reading, writing) or data parsing will cause the promise to reject. It's crucial to wrap calls to database methods in `try...catch` blocks or use `.catch()` on the returned promises to handle potential errors gracefully. The database also logs some internal errors or warnings to the console (e.g., file creation, issues during atomic writes, batch operation errors).
+                     </p>
+
+                </section>
+
+
+                <!-- API Reference Card -->
+                <section id="api" class="card">
+                    <h2>API Reference</h2>
+
+                    <article id="api-constructor">
+                        <h3><code>new JSONDatabase(filename, [options])</code></h3>
+                        <p>Creates a new database instance linked to a specific JSON file.</p>
+                        <h4>Parameters:</h4>
+                        <ul class="params">
+                            <li><code>filename</code><span class="param-type">(String)</span> - The path to the database file. If the filename doesn't end with <code>.json</code>, it will be appended automatically. Relative paths are resolved relative to the current working directory. Use `path.join(__dirname, ...)` for paths relative to the script file.</li>
+                            <li><code>options</code><span class="param-type">(Object)</span><span class="optional">Optional</span> - Configuration options:
+                                <ul>
+                                    <li><code>batchSize</code><span class="param-type">(Number)</span><span class="optional">Optional</span> - Deprecated/Not actively used in current implementation but kept for potential future batching strategies. Default: <code>100</code>.</li>
+                                    <li><code>autoFlush</code><span class="param-type">(Boolean)</span><span class="optional">Optional</span> - Deprecated/Not actively used as writes are immediate per operation. Default: <code>true</code>.</li>
+                                    <li><code>prettyPrint</code><span class="param-type">(Boolean)</span><span class="optional">Optional</span> - If <code>true</code>, the JSON file will be saved with human-readable indentation (2 spaces). If <code>false</code>, it will be saved compactly on a single line. Default: <code>false</code>.</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <h4>Behavior:</h4>
+                        <ul>
+                            <li>Resolves the full path to the JSON file.</li>
+                            <li>Initializes internal state (cache, locks, config, stats).</li>
+                            <li>Asynchronously starts loading the data from the file into the cache via <code>_init()</code>. If the file doesn't exist, it attempts to create it with empty content <code>{}</code>.</li>
+                        </ul>
+                        <h4>Example:</h4>
+                        <pre><code class="language-javascript">const JSONDatabase = require('./JSONDatabase');
+const path = require('path');
+
+// Basic usage - file 'data.json' in the same directory
+const db1 = new JSONDatabase('data');
+
+// Usage with options - file 'config.json' with pretty printing
+const db2 = new JSONDatabase('config.json', { prettyPrint: true });
+
+// Recommended: Use absolute paths or resolve relative paths properly
+const db3 = new JSONDatabase(path.join(__dirname, 'db', 'my_app_data'));
+</code></pre>
+                    </article>
+
+                    <article id="api-get">
+                        <h3><code>async get(path, [defaultValue])</code></h3>
+                        <p>Retrieves the value at a specific path within the JSON data.</p>
+                        <h4>Parameters:</h4>
+                        <ul class="params">
+                            <li><code>path</code><span class="param-type">(String)</span> - The dot notation path to the desired value (e.g., <code>'user.address.city'</code>, <code>'products[0].name'</code>).</li>
+                            <li><code>defaultValue</code><span class="param-type">(any)</span><span class="optional">Optional</span> - The value to return if the path does not exist in the data. If omitted, <code>undefined</code> is returned for non-existent paths.</li>
+                        </ul>
+                        <h4>Returns:</h4>
+                        <p><code>Promise&lt;any&gt;</code> - A promise that resolves with the value found at the path, or the <code>defaultValue</code> if the path doesn't exist.</p>
+                        <h4>Behavior:</h4>
+                        <ul>
+                            <li>Reads from the in-memory cache if available.</li>
+                            <li>If the cache is not populated, it triggers a cache refresh from the file first.</li>
+                            <li>Uses <code>lodash.get</code> for path resolution.</li>
+                            <li>Increments the <code>stats.hits</code> counter.</li>
+                        </ul>
+                        <h4>Example:</h4>
+                        <pre><code class="language-javascript">// Assuming db contains: { user: { name: 'Bob' }, items: ['a', 'b'] }
+
+const name = await db.get('user.name'); // -> 'Bob'
+const firstItem = await db.get('items[0]'); // -> 'a'
+const age = await db.get('user.age', 99); // -> 99 (since 'user.age' doesn't exist)
+const nonExistent = await db.get('settings.theme'); // -> undefined
+</code></pre>
+                    </article>
+
+                    <article id="api-set">
+                        <h3><code>async set(path, value)</code></h3>
+                        <p>Sets or updates the value at a specific path within the JSON data. This is an atomic write operation.</p>
+                        <h4>Parameters:</h4>
+                        <ul class="params">
+                            <li><code>path</code><span class="param-type">(String)</span> - The dot notation path where the value should be set (e.g., <code>'user.profile.email'</code>, <code>'tags[1]'</code>). If intermediate paths don't exist, they will be created as objects.</li>
+                            <li><code>value</code><span class="param-type">(any)</span> - The value to set at the specified path. This can be any JSON-serializable value (string, number, boolean, object, array, null).</li>
+                        </ul>
+                        <h4>Returns:</h4>
+                        <p><code>Promise&lt;void&gt;</code> - A promise that resolves when the operation (including file write) is complete.</p>
+                        <h4>Behavior:</h4>
+                        <ul>
+                            <li>Performs the operation within an atomic write lock (<code>_atomicWrite</code>).</li>
+                            <li>Reads the current data (from cache or file).</li>
+                            <li>Uses <code>lodash.set</code> to modify the data in memory.</li>
+                            <li>Writes the *entire* modified data object back to the JSON file.</li>
+                            <li>Updates the in-memory cache with the new data.</li>
+                            <li>Increments the <code>stats.writes</code> counter.</li>
+                        </ul>
+                        <h4>Example:</h4>
+                        <pre><code class="language-javascript">await db.set('config.theme', 'dark');
+await db.set('users.alice.roles', ['admin', 'editor']);
+await db.set('products[0].price', 19.99); // Sets price of the first product
+await db.set('server.port', 8080);
+// If db was {}, after the above it might be:
+// { config: { theme: 'dark' }, users: { alice: { roles: ['admin', 'editor'] } }, products: [ { price: 19.99 } ], server: { port: 8080 } }
+</code></pre>
+                    </article>
+
+                    <article id="api-push">
+                        <h3><code>async push(path, ...items)</code></h3>
+                        <p>Adds one or more items to the end of an array at a specific path, ensuring uniqueness. If the target path doesn't exist or isn't an array, it initializes it as an array before pushing. This is an atomic write operation.</p>
+                        <h4>Parameters:</h4>
+                        <ul class="params">
+                            <li><code>path</code><span class="param-type">(String)</span> - The dot notation path to the target array.</li>
+                            <li><code>...items</code><span class="param-type">(any)</span> - One or more items to add to the array.</li>
+                        </ul>
+                        <h4>Returns:</h4>
+                        <p><code>Promise&lt;void&gt;</code> - A promise that resolves when the operation is complete.</p>
+                        <h4>Behavior:</h4>
+                        <ul>
+                            <li>Performs the operation atomically.</li>
+                            <li>Retrieves the array at the given path (or initializes an empty array `[]` if it doesn't exist).</li>
+                            <li>If the target exists but is not an array, it throws an error.</li>
+                            <li>Iterates through the provided <code>items</code>. Each item is added to the array *only if it is not already present* (using simple `includes()` check).</li>
+                            <li>If any items were actually added (i.e., the array changed), it writes the modified data back to the file and updates the cache. Otherwise, no write occurs.</li>
+                        </ul>
+                        <div class="note">
+                            <strong>Note:</strong> Uniqueness is based on strict equality (`===`) via `Array.prototype.includes()`. For objects, this means they must be the exact same reference to be considered duplicates. Pushing distinct objects with identical content will add both.
+                        </div>
+                        <h4>Example:</h4>
+                        <pre><code class="language-javascript">await db.set('tags', ['news']); // Start with ['news']
+await db.push('tags', 'sports', 'tech'); // -> ['news', 'sports', 'tech']
+await db.push('tags', 'local', 'news'); // -> ['news', 'sports', 'tech', 'local'] ('news' was ignored)
+
+await db.push('new_list', 1, 2); // Creates 'new_list' as [1, 2]
+
+// Example with objects (references matter)
+const obj1 = { id: 1 };
+await db.push('items', obj1); // -> [{ id: 1 }]
+await db.push('items', obj1); // -> [{ id: 1 }] (ignored)
+await db.push('items', { id: 1 }); // -> [{ id: 1 }, { id: 1 }] (added, different reference)
+</code></pre>
+                    </article>
+
+                    <article id="api-pull">
+                        <h3><code>async pull(path, ...itemsToRemove)</code></h3>
+                        <p>Removes all specified items from an array at a specific path. This is an atomic write operation.</p>
+                        <h4>Parameters:</h4>
+                        <ul class="params">
+                            <li><code>path</code><span class="param-type">(String)</span> - The dot notation path to the target array.</li>
+                            <li><code>...itemsToRemove</code><span class="param-type">(any)</span> - One or more items to remove from the array.</li>
+                        </ul>
+                        <h4>Returns:</h4>
+                        <p><code>Promise&lt;void&gt;</code> - A promise that resolves when the operation is complete.</p>
+                        <h4>Behavior:</h4>
+                        <ul>
+                            <li>Performs the operation atomically.</li>
+                            <li>Retrieves the value at the given path.</li>
+                            <li>If the value is not an array, the operation does nothing and a warning might be logged.</li>
+                            <li>If it is an array, it uses <code>lodash.pull</code> to remove *all occurrences* of the specified <code>itemsToRemove</code> from the array (modifies the array in place).</li>
+                            <li>If the array's length changed as a result of pulling items, it writes the modified data back to the file and updates the cache. Otherwise, no write occurs.</li>
+                        </ul>
+                        <h4>Example:</h4>
+                        <pre><code class="language-javascript">await db.set('tasks', ['read', 'write', 'sleep', 'read']);
+await db.pull('tasks', 'read'); // -> ['write', 'sleep'] (all 'read' instances removed)
+
+await db.pull('tasks', 'eat'); // -> ['write', 'sleep'] (no change, 'eat' wasn't there)
+
+await db.pull('non_array_path', 'something'); // Does nothing if 'non_array_path' isn't an array
+
+await db.set('numbers', [1, 2, 3, 1, 4, 1]);
+await db.pull('numbers', 1, 3); // -> [2, 4]
+</code></pre>
+                    </article>
+
+                    <article id="api-delete">
+                        <h3><code>async delete(path)</code></h3>
+                        <p>Deletes the property (and its value) at a specific path. This is an atomic write operation.</p>
+                        <h4>Parameters:</h4>
+                        <ul class="params">
+                            <li><code>path</code><span class="param-type">(String)</span> - The dot notation path to the property to delete (e.g., <code>'user.temporaryToken'</code>, <code>'cache[0]'</code>).</li>
+                        </ul>
+                        <h4>Returns:</h4>
+                        <p><code>Promise&lt;boolean&gt;</code> - A promise that resolves with <code>true</code> if the path existed and was successfully deleted, or <code>false</code> if the path did not exist.</p>
+                        <h4>Behavior:</h4>
+                        <ul>
+                            <li>Performs the operation atomically.</li>
+                            <li>Uses <code>lodash.unset</code> to remove the property from the data.</li>
+                            <li>Writes the modified data back to the file and updates the cache.</li>
+                            <li>Returns whether the <code>unset</code> operation reported success (meaning the path existed).</li>
+                        </ul>
+                        <h4>Example:</h4>
+                        <pre><code class="language-javascript">await db.set('user', { name: 'Charlie', temporary: true });
+const wasDeleted = await db.delete('user.temporary'); // -> true
+const data = await db.get('user'); // -> { name: 'Charlie' }
+
+const wasDeletedAgain = await db.delete('user.temporary'); // -> false (already gone)
+const deletedNonExistent = await db.delete('settings.color'); // -> false
+</code></pre>
+                    </article>
+
+                    <article id="api-has">
+                        <h3><code>async has(path)</code></h3>
+                        <p>Checks if a path exists within the JSON data.</p>
+                        <h4>Parameters:</h4>
+                        <ul class="params">
+                            <li><code>path</code><span class="param-type">(String)</span> - The dot notation path to check.</li>
+                        </ul>
+                        <h4>Returns:</h4>
+                        <p><code>Promise&lt;boolean&gt;</code> - A promise that resolves with <code>true</code> if the path exists (even if its value is <code>null</code> or <code>undefined</code>), or <code>false</code> otherwise.</p>
+                        <h4>Behavior:</h4>
+                        <ul>
+                            <li>Reads from the in-memory cache if available.</li>
+                            <li>If the cache is not populated, it triggers a cache refresh from the file first.</li>
+                            <li>Uses <code>lodash.has</code> for the existence check.</li>
+                        </ul>
+                        <h4>Example:</h4>
+                        <pre><code class="language-javascript">// Assuming db contains: { user: { name: 'David', id: null }, config: {} }
+
+const hasName = await db.has('user.name'); // -> true
+const hasId = await db.has('user.id'); // -> true (path exists, value is null)
+const hasAge = await db.has('user.age'); // -> false
+const hasConfig = await db.has('config'); // -> true (path exists, value is {})
+const hasTheme = await db.has('config.theme'); // -> false
+</code></pre>
+                    </article>
+
+                    <article id="api-transaction">
+                        <h3><code>async transaction(asyncFn)</code></h3>
+                        <p>Executes a function with the current database state, allowing multiple reads and modifications within a single atomic operation.</p>
+                        <h4>Parameters:</h4>
+                        <ul class="params">
+                            <li><code>asyncFn</code><span class="param-type">(Function)</span> - An asynchronous function that receives the current database data (a deep clone) as its argument. This function should perform its logic and **must return the modified data object** for the changes to be saved.</li>
+                        </ul>
+                        <h4>Returns:</h4>
+                        <p><code>Promise&lt;any&gt;</code> - A promise that resolves with the value returned by the <code>asyncFn</code> (which should be the final state of the data after the transaction). Rejects if `asyncFn` throws an error or if the file write fails.</p>
+                        <h4>Behavior:</h4>
+                        <ul>
+                            <li>Performs the entire operation within an atomic write lock.</li>
+                            <li>Provides a deep clone of the current data to the <code>asyncFn</code>.</li>
+                            <li>The <code>asyncFn</code> can perform complex logic, read different parts of the data, and make multiple modifications using direct object manipulation or lodash functions.</li>
+                            <li>**Crucially, the <code>asyncFn</code> MUST return the data object that should be written back to the file.** If it returns <code>undefined</code> (e.g., by not having an explicit `return` statement or returning `undefined`), a warning is logged, and the original data (before the transaction function was called) might be written back, effectively discarding the changes made within the function.</li>
+                            <li>If the `asyncFn` returns the modified data, that data is written to the file and updates the cache.</li>
+                        </ul>
+                        <div class="note">
+                            <strong>Important:</strong> Always ensure your transaction function returns the modified data object. If you decide no changes should be saved based on some condition within the function, return the original data object that was passed in.
+                        </div>
+                        <h4>Example:</h4>
+                        <pre><code class="language-javascript">// Example 1: Atomically increment a counter
+await db.set('stats.visits', 0);
+
+await db.transaction(async (data) => {
+  const currentVisits = data.stats.visits || 0;
+  data.stats.visits = currentVisits + 1;
+  // MUST return the modified data
+  return data;
+});
+
+console.log(await db.get('stats.visits')); // -> 1
+
+// Example 2: Complex update involving multiple fields
+await db.set('users.jane', { credits: 100, status: 'active' });
+
+await db.transaction(async (data) => {
+  const user = data.users.jane;
+  if (user.status === 'active' && user.credits > 50) {
+    user.credits -= 50;
+    user.lastAction = new Date().toISOString();
+    console.log('Performed action for Jane');
+  } else {
+    console.log('Condition not met for Jane');
+    // No changes needed, return the original data to avoid unnecessary write
+    // Although returning the modified 'data' object which wasn't modified is also fine.
+  }
+  // Return the potentially modified data object
+  return data;
+});
+
+console.log(await db.get('users.jane')); // -> { credits: 50, status: 'active', lastAction: '...' }
+</code></pre>
+                    </article>
+
+                    <article id="api-batch">
+                        <h3><code>async batch(ops)</code></h3>
+                        <p>Performs multiple write operations (`set`, `delete`, `push`, `pull`) together as a single atomic unit.</p>
+                        <h4>Parameters:</h4>
+                        <ul class="params">
+                            <li><code>ops</code><span class="param-type">(Array&lt;Object&gt;)</span> - An array of operation objects. Each object must have a <code>type</code> property and other properties depending on the type:
+                                <ul>
+                                    <li><code>{ type: 'set', path: String, value: any }</code></li>
+                                    <li><code>{ type: 'delete', path: String }</code></li>
+                                    <li><code>{ type: 'push', path: String, values: Array&lt;any&gt; }</code> (Adds unique items from the <code>values</code> array)</li>
+                                    <li><code>{ type: 'pull', path: String, values: Array&lt;any&gt; }</code> (Removes items specified in the <code>values</code> array)</li>
+                                </ul>
+                            </li>
+                        </ul>
+                         <h4>Returns:</h4>
+                        <p><code>Promise&lt;void&gt;</code> - A promise that resolves when all operations in the batch have been applied and the file write is complete.</p>
+                        <h4>Behavior:</h4>
+                        <ul>
+                            <li>Performs all operations within a single atomic write lock.</li>
+                            <li>Reads the current data once at the beginning.</li>
+                            <li>Applies each operation in the <code>ops</code> array sequentially to the in-memory data.</li>
+                            <li>Handles errors within individual operations: If an operation like `push` or `pull` targets a non-array, it's typically skipped with a warning. If an invalid `type` is provided, it's skipped with a warning. A more critical error during an operation (though less likely with basic types) might still log an error, but the batch processing currently continues to the next operation.</li>
+                            <li>After processing all operations, writes the final modified data back to the file once.</li>
+                            <li>Updates the in-memory cache.</li>
+                        </ul>
+                         <div class="note">
+                            <strong>Efficiency:</strong> Batching is more efficient than performing many individual write operations (`set`, `push`, etc.) sequentially, as it involves only one file read and one file write for the entire set of operations.
+                        </div>
+                        <h4>Example:</h4>
+                        <pre><code class="language-javascript">const operations = [
+  { type: 'set', path: 'config.updated', value: true },
+  { type: 'set', path: 'user.status', value: 'offline' },
+  { type: 'push', path: 'log', values: [`Batch update at ${new Date().toISOString()}`] },
+  { type: 'pull', path: 'old_settings', values: ['beta_feature', 'debug_mode'] },
+  { type: 'delete', path: 'temp.data' }
+];
+
+await db.batch(operations);
+
+console.log(await db.get('config.updated')); // -> true
+console.log(await db.get('user.status')); // -> offline
+console.log(await db.has('temp.data')); // -> false
+</code></pre>
+                    </article>
+
+                    <article id="api-query">
+                        <h3><code>async query(predicate, [options])</code></h3>
+                        <p>Searches through the top-level properties of the database object (or a sub-object specified by `basePath`) and returns an array of values that satisfy the predicate function.</p>
+                        <h4>Parameters:</h4>
+                        <ul class="params">
+                            <li><code>predicate</code><span class="param-type">(Function)</span> - A function that takes `(value, key)` as arguments and returns `true` if the item should be included in the results.
+                                <ul>
+                                    <li>`value`: The value of the property being evaluated.</li>
+                                    <li>`key`: The key (name) of the property being evaluated.</li>
+                                </ul>
+                            </li>
+                            <li><code>options</code><span class="param-type">(Object)</span><span class="optional">Optional</span> - Query options:
+                                <ul>
+                                    <li><code>basePath</code><span class="param-type">(String)</span><span class="optional">Optional</span> - A dot notation path to an object within the database to query over. If omitted, queries the top-level keys of the database.</li>
+                                    <li><code>includeKeys</code><span class="param-type">(Boolean)</span><span class="optional">Optional</span> - If <code>true</code> and `basePath` is *not* set, wraps results in an object `{ key: '...', ...value }` (if value is an object) or `{ key: '...', value: ... }` (if value is primitive). Default: <code>false</code>.</li>
+                                    <li><code>limit</code><span class="param-type">(Number)</span><span class="optional">Optional</span> - Maximum number of results to return.</li>
+                                    <li><code>sortBy</code><span class="param-type">(String | Function)</span><span class="optional">Optional</span> - *Note: Sorting logic is not fully implemented in the provided code snippet, but the parameter exists.* Conceptually, would sort results based on a property path or a custom comparator function.</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <h4>Returns:</h4>
+                        <p><code>Promise&lt;Array&lt;any&gt;&gt;</code> - A promise that resolves with an array containing the values (or wrapped objects if `includeKeys` is true) that passed the predicate function, potentially limited and sorted.</p>
+                        <h4>Behavior:</h4>
+                        <ul>
+                            <li>Reads from the cache or refreshes if needed.</li>
+                            <li>Determines the data object to iterate over (either the root or the object at `basePath`).</li>
+                            <li>Uses `lodash.forOwn` to iterate over the properties of the target object.</li>
+                            <li>Calls the `predicate` function for each property.</li>
+                            <li>Collects the values (or modified objects if `includeKeys` is true) for which the predicate returns `true`.</li>
+                            <li>Applies `limit` if specified.</li>
+                            <li>(Conceptually applies `sortBy` if specified and implemented).</li>
+                        </ul>
+                        <h4>Example:</h4>
+                        <pre><code class="language-javascript">// Assuming db contains:
+                        // {
+                        //   users: {
+                        //     'user1': { name: 'Alice', age: 30, active: true },
+                        //     'user2': { name: 'Bob', age: 25, active: false },
+                        //     'user3': { name: 'Charlie', age: 35, active: true }
+                        //   },
+                        //   products: {
+                        //      'prodA': { price: 10 }, 'prodB': { price: 20 }
+                        //   }
+                        // }
+
+                        // Find all active users (querying within 'users')
+                        const activeUsers = await db.query(
+                            (user) => user.active === true,
+                            { basePath: 'users' }
+                        );
+                        // -> [ { name: 'Alice', age: 30, active: true }, { name: 'Charlie', age: 35, active: true } ]
+
+                        // Find top-level keys containing 'prod' and include the key
+                        const productEntries = await db.query(
+                            (value, key) => key.includes('prod'),
+                            { includeKeys: true }
+                        );
+                        // -> [ { key: 'products', products: { 'prodA': { price: 10 }, 'prodB': { price: 20 } } } ]
+                        // Note: includeKeys works best when querying the root and expecting objects/primitives directly under it.
+
+                        // Find users older than 28
+                        const olderUsers = await db.query(
+                            (user) => user.age > 28,
+                            { basePath: 'users' }
+                        );
+                        // -> [ { name: 'Alice', age: 30, active: true }, { name: 'Charlie', age: 35, active: true } ]
+
+                         // Find first active user (using limit)
+                        const firstActiveUser = await db.query(
+                            (user) => user.active === true,
+                            { basePath: 'users', limit: 1 }
+                        );
+                        // -> [ { name: 'Alice', age: 30, active: true } ]
+                        </code></pre>
+                    </article>
+
+                    <article id="api-close">
+                        <h3><code>async close()</code></h3>
+                        <p>Closes the database connection. Ensures any pending write operations complete before clearing the cache.</p>
+                        <h4>Parameters:</h4>
+                        <p>None.</p>
+                         <h4>Returns:</h4>
+                        <p><code>Promise&lt;void&gt;</code> - A promise that resolves when all pending operations are finished and the cache is cleared.</p>
+                        <h4>Behavior:</h4>
+                        <ul>
+                            <li>Waits for all promises currently stored in the internal `locks` map to resolve or reject. This ensures any ongoing `_atomicWrite` operations finish writing to the file.</li>
+                            <li>Sets the internal cache (`this.cache`) to <code>null</code>.</li>
+                            <li>Logs a confirmation message to the console.</li>
+                        </ul>
+                        <div class="note">
+                            <strong>Important:</strong> Call <code>close()</code> when your application is shutting down or no longer needs to interact with the database file. This guarantees data integrity by allowing writes to finish properly. Subsequent operations on the closed instance will likely trigger cache refreshes or potentially fail if attempted during shutdown.
+                        </div>
+                        <h4>Example:</h4>
+                        <pre><code class="language-javascript">await db.set('status', 'shutting down');
+// ... other cleanup
+
+await db.close();
+console.log('Application finished.');
+</code></pre>
+                    </article>
+                </section>
+
+                <!-- Properties Card -->
+                <section id="properties" class="card">
+                    <h2>Properties</h2>
+                    <p>These properties are available on a <code>JSONDatabase</code> instance:</p>
+                    <ul class="props">
+                        <li><code>filename</code><span class="prop-type">(String)</span> - The fully resolved, absolute path to the JSON database file being used.</li>
+                        <li><code>config</code><span class="prop-type">(Object)</span> - The configuration object passed during instantiation, merged with defaults. Contains <code>batchSize</code>, <code>autoFlush</code>, and <code>prettyPrint</code> settings.</li>
+                        <li><code>stats</code><span class="prop-type">(Object)</span> - An object containing basic usage statistics:
+                            <ul>
+                                <li><code>reads</code><span class="prop-type">(Number)</span> - Number of times the database file was physically read (e.g., during init or cache refresh).</li>
+                                <li><code>writes</code><span class="prop-type">(Number)</span> - Number of times the database file was written to (corresponds to completed atomic write operations).</li>
+                                <li><code>hits</code><span class="prop-type">(Number)</span> - Number of times data was successfully retrieved from the cache using <code>get()</code>.</li>
+                            </ul>
+                        </li>
+                    </ul>
+                     <div class="note">
+                         <strong>Internal Properties:</strong> Properties like <code>cache</code> and <code>locks</code> are used internally. You should generally avoid directly manipulating them. Interact with the database through the provided methods.
+                     </div>
+                     <h4>Example: Accessing Properties</h4>
+                     <pre><code class="language-javascript">const db = new JSONDatabase('app_data', { prettyPrint: true });
+// ... after some operations ...
+
+console.log(`Database file: ${db.filename}`);
+console.log(`Pretty print enabled: ${db.config.prettyPrint}`);
+console.log(`Stats: Reads=${db.stats.reads}, Writes=${db.stats.writes}, Cache Hits=${db.stats.hits}`);
+
+// Resetting stats (example, use carefully)
+// db.stats = { reads: 0, writes: 0, hits: 0 };
+</code></pre>
+                </section>
+
+            </div>
+        </main>
+    </div> <!-- End Content Wrapper -->
+
+    <footer>
+        <div class="container">
+            JSONDatabase.js Documentation | Inspired by Material Design
+        </div>
+    </footer>
+
+    <!-- Prism.js Core & JS Language Component -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <!-- Simple Sidebar Toggle Script -->
+    <script>
+        const menuToggle = document.getElementById('menu-toggle');
+        const body = document.body;
+        const sidebar = document.getElementById('sidebar');
+
+        if (menuToggle) {
+            menuToggle.addEventListener('click', () => {
+                body.classList.toggle('sidebar-open');
+            });
+        }
+
+        // Close sidebar when clicking outside of it on mobile overlay
+         body.addEventListener('click', function(event) {
+             if (body.classList.contains('sidebar-open') && !sidebar.contains(event.target) && !menuToggle.contains(event.target)) {
+                body.classList.remove('sidebar-open');
+             }
+         });
+
+         // Optional: Close sidebar when a navigation link is clicked (useful on mobile)
+         const sidebarLinks = sidebar.querySelectorAll('a');
+         sidebarLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                 // Check if the screen width is within the mobile breakpoint
+                 if (window.innerWidth <= 992) {
+                      body.classList.remove('sidebar-open');
+                 }
+            });
+         });
+
+
+    </script>
+
+</body>
+</html>
