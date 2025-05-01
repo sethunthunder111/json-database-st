@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple JSON DB - Documentation</title>
+    <title>JSONDatabase by ST</title>
     <!-- Google Fonts - Roboto -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -138,7 +138,7 @@
                          A simple, promise-based JSON file database for Node.js with atomic operations, transactions, and lodash integration.
                      </p>
                      <p>
-                        <code>simple-json-db</code> provides a straightforward interface for managing data stored in a single JSON file. It's designed for Node.js environments and offers features like:
+                        <code>json-database-st</code> provides a straightforward interface for managing data stored in a single JSON file. It's designed for Node.js environments and offers features like:
                     </p>
                     <ul>
                         <li><strong>Atomic Operations:</strong> Ensures write operations are indivisible, preventing data corruption.</li>
@@ -158,11 +158,11 @@
 
                     <h3>Installation</h3>
                     <p>Install the package and its required peer dependency `lodash` using npm or yarn:</p>
-                    <pre><code class="language-bash">npm install simple-json-db lodash
+                    <pre><code class="language-bash">npm install json-database-st lodash
 # or
-yarn add simple-json-db lodash</code></pre>
+yarn add json-database-st lodash</code></pre>
                     <p>Then, require the library in your project:</p>
-                    <pre><code class="language-javascript">const JSONDatabase = require('simple-json-db'); // Use your actual package name</code></pre>
+                    <pre><code class="language-javascript">const JSONDatabase = require('json-database-st'); // Use your actual package name</code></pre>
                 </section>
 
                 <!-- Getting Started Card -->
@@ -170,7 +170,7 @@ yarn add simple-json-db lodash</code></pre>
                     <h2>Getting Started</h2>
                     <p>Here's a basic example of how to use the database:</p>
                     <pre><code class="language-javascript">// main.js
-const JSONDatabase = require('simple-json-db'); // Use your package name
+const JSONDatabase = require('json-database-st'); // Use your package name
 const path = require('path');
 
 // Create or load 'my_database.json' in a 'data' subdirectory
@@ -281,7 +281,7 @@ main();
                             <li>Starts asynchronous loading/creation of the file into the cache. Operations implicitly await this initialization.</li>
                         </ul>
                         <h4>Example:</h4>
-                        <pre><code class="language-javascript">const JSONDatabase = require('simple-json-db');
+                        <pre><code class="language-javascript">const JSONDatabase = require('json-database-st');
 const path = require('path');
 
 const db1 = new JSONDatabase('data'); // Targets ./data.json
