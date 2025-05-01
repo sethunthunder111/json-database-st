@@ -25,8 +25,6 @@ Ideal for small projects, prototypes, configuration management, or simple data p
 ```bash
 # Make sure you have lodash installed as well
 npm install json-database-st lodash
-# or
-yarn add json-database-st lodash
 ```
 
 
