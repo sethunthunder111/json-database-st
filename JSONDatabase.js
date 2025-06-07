@@ -1,5 +1,5 @@
 // File: JSONDatabase.js
-// Final, Complete, and Secure Version
+// Final, Complete, and Secure Version (Patched)
 
 const fs = require('fs').promises;
 const path = require('path');
@@ -218,7 +218,9 @@ class JSONDatabase extends EventEmitter {
       const dataToModify = _.cloneDeep(oldData);
 
       try {
-        const newData = operationFn(dataToModify);
+        // --- FIX: Await the operation function in case it's async ---
+        const newData = await operationFn(dataToModify);
+
         if (newData === undefined) {
           throw new TransactionError("Atomic operation function returned undefined. Aborting to prevent data loss.");
         }
@@ -334,6 +336,10 @@ class JSONDatabase extends EventEmitter {
   async get(path, defaultValue) {
     await this._ensureInitialized();
     this.stats.cacheHits++;
+    // --- FIX: Handle undefined/null path to get the entire object ---
+    if (path === undefined || path === null) {
+      return this.cache;
+    }
     return _.get(this.cache, path, defaultValue);
   }
 
