@@ -6,7 +6,7 @@ const path = require("path");
 const crypto = require("crypto");
 const _ = require("lodash");
 const EventEmitter = require("events");
-// --- FIX: Add dependency for cross-process file locking. Run `npm install proper-lockfile`.
+
 const lockfile = require("proper-lockfile");
 
 // --- Custom Error Classes for Better Error Handling ---
