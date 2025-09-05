@@ -102,6 +102,15 @@ run();
 
 **[View Full Documentation Website](https://sethunthunder111.github.io/json-database-st/)**
 
+## Performance
+
+The library is designed for high performance, especially for read-heavy workloads. Indexed lookups are nearly instantaneous (`O(1)`), and the `multiProcess: false` option provides a significant boost for write speeds in single-process applications.
+
+For a detailed analysis, see the comprehensive benchmark report.
+
+- **[View the detailed Benchmark Analysis (BENCHMARKS.md)](BENCHMARKS.md)**
+- **[View the interactive HTML Report](https://sethunthunder111.github.io/json-database-st/benchmarks.html)**
+
 ## API Summary
 
 *   `new JSONDatabase(filename, [options])`

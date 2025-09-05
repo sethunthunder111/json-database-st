@@ -140,9 +140,60 @@ class JSONDatabase extends EventEmitter {
         this.writeLock = Promise.resolve();
         this.stats = { reads: 0, writes: 0, cacheHits: 0 };
         this._indices = new Map();
+        this._middleware = {
+            before: { set: [], delete: [], push: [], pull: [], transaction: [], batch: [] },
+            after: { set: [], delete: [], push: [], pull: [], transaction: [], batch: [] }
+        };
 
         // Asynchronously initialize. Operations will queue behind this promise.
         this._initPromise = this._initialize();
+    }
+
+    // --- Middleware ---
+
+    /**
+     * Registers a middleware function to run before an operation.
+     * @param {'set'|'delete'|'push'|'pull'|'transaction'|'batch'} operation - The operation type.
+     * @param {string} pathPattern - A lodash path with optional wildcards (e.g., 'users.*.name').
+     * @param {Function} callback - The middleware function. It receives an object with context (path, value, etc.) and can modify it.
+     */
+    before(operation, pathPattern, callback) {
+        if (this._middleware.before[operation]) {
+            const regex = new RegExp(`^${pathPattern.replace(/\*/g, '[^.]+').replace(/\./g, '\.')}$`);
+            this._middleware.before[operation].push({ regex, callback });
+        }
+    }
+
+    /**
+     * Registers a middleware function to run after an operation.
+     * @param {'set'|'delete'|'push'|'pull'|'transaction'|'batch'} operation - The operation type.
+     * @param {string} pathPattern - A lodash path with optional wildcards (e.g., 'users.*.name').
+     * @param {Function} callback - The middleware function. It receives an object with context (path, value, finalData).
+     */
+    after(operation, pathPattern, callback) {
+        if (this._middleware.after[operation]) {
+            const regex = new RegExp(`^${pathPattern.replace(/\*/g, '[^.]+').replace(/\./g, '\.')}$`);
+            this._middleware.after[operation].push({ regex, callback });
+        }
+    }
+
+    /**
+     * @private
+     * Executes middleware for a given hook and operation.
+     */
+    _runMiddleware(hook, operation, context) {
+        const middlewares = this._middleware[hook][operation] || [];
+        let modifiedContext = context;
+
+        for (const { regex, callback } of middlewares) {
+            if (regex.test(modifiedContext.path)) {
+                modifiedContext = callback(modifiedContext);
+                if (hook === 'before' && !modifiedContext) {
+                    throw new Error(`Middleware for ${operation} on path ${context.path} must return a context object.`);
+                }
+            }
+        }
+        return modifiedContext;
     }
 
     // --- Encryption & Decryption ---
@@ -219,7 +270,7 @@ class JSONDatabase extends EventEmitter {
             );
             this.emit("error", initError);
             console.error(
-                `[JSONDatabase] FATAL: Initialization failed for ${this.filename}. The database is in an unusable state.`,
+                `[JSONDatabase] FATAL: Initialization failed for ${this.filename}. The database is in an unusable state.`, 
                 err
             );
             // --- ENHANCEMENT: Make the instance unusable if init fails ---
@@ -267,88 +318,69 @@ class JSONDatabase extends EventEmitter {
     async _atomicWrite(operationFn) {
         await this._ensureInitialized();
 
-        // This promise chain ensures all writes *from this process* happen one after another.
-        this.writeLock = this.writeLock.then(async () => {
+        const executeWrite = async () => {
             let releaseLock;
             try {
-                // --- FIX: Ensure the file exists before locking it.
                 await fs.access(this.filename).catch(() => fs.writeFile(this.filename, this.config.encryptionKey ? this._encrypt({}) : '{}', 'utf8'));
 
-                // --- FIX: Acquire a cross-process lock to prevent race conditions.
-                // This will wait if another process (or this one) currently holds the lock.
                 releaseLock = await lockfile.lock(this.filename, {
-                    stale: 7000, // Lock is considered stale after 7s
-                    retries: {
-                        retries: 5,
-                        factor: 1.2,
-                        minTimeout: 200,
-                    },
+                    stale: 7000,
+                    retries: { retries: 5, factor: 1.2, minTimeout: 200 },
                 });
 
-                // --- FIX: Refresh cache *after* acquiring the lock.
-                // This is critical to get the latest data if another process changed it.
                 await this._refreshCache();
-
                 const oldData = this.cache;
                 const dataToModify = _.cloneDeep(oldData);
-
                 const newData = await operationFn(dataToModify);
 
                 if (newData === undefined) {
-                    throw new TransactionError(
-                        "Atomic operation function returned undefined. Aborting to prevent data loss. Did you forget to `return data`?"
-                    );
+                    throw new TransactionError("Atomic operation function returned undefined. Aborting to prevent data loss. Did you forget to `return data`?");
                 }
 
                 if (this.config.schema) {
                     const validationResult = this.config.schema.safeParse(newData);
                     if (!validationResult.success) {
-                        throw new ValidationError(
-                            "Schema validation failed.",
-                            validationResult.error.issues
-                        );
+                        throw new ValidationError("Schema validation failed.", validationResult.error.issues);
                     }
                 }
 
                 this._updateIndices(oldData, newData);
 
                 if (this.config.writeOnChange && _.isEqual(newData, oldData)) {
-                    return oldData; // Return the unchanged data
+                    return oldData;
                 }
 
                 const contentToWrite = this.config.encryptionKey
                     ? this._encrypt(newData)
                     : JSON.stringify(newData, null, this.config.prettyPrint ? 2 : 0);
 
-                // --- FIX: Implement durable write. Write to temp file first.
                 const tempFile = this.filename + ".tmp";
                 await fs.writeFile(tempFile, contentToWrite, "utf8");
-                // --- FIX: Atomically rename temp file to the final filename.
                 await fs.rename(tempFile, this.filename);
 
                 this.cache = newData;
                 this.stats.writes++;
-
                 this.emit("write", { filename: this.filename, timestamp: Date.now() });
                 this.emit("change", { oldValue: oldData, newValue: newData });
 
                 return newData;
             } catch (error) {
                 this.emit("error", error);
-                console.error(
-                    "[JSONDatabase] Atomic write failed. No changes were saved.",
-                    error
-                );
+                // Do not log here, let the caller handle the error.
                 throw error;
             } finally {
-                // --- FIX: Always release the lock, even if an error occurred.
                 if (releaseLock) {
                     await releaseLock();
                 }
             }
-        });
+        };
 
-        return this.writeLock;
+        // Create a promise for the current operation.
+        const operationPromise = this.writeLock.then(() => executeWrite());
+        // Prevent the main chain from breaking on a rejection, allowing subsequent writes.
+        this.writeLock = operationPromise.catch(() => {});
+        // Return the promise for the current operation so the caller can handle its specific result/error.
+        return operationPromise;
     }
 
     // --- Indexing ---
@@ -440,45 +472,70 @@ class JSONDatabase extends EventEmitter {
     }
 
     async set(path, value) {
-        return this._atomicWrite((data) => {
-            _.set(data, path, value);
+        let context = { path, value };
+        context = this._runMiddleware('before', 'set', context);
+
+        const result = await this._atomicWrite((data) => {
+            _.set(data, context.path, context.value);
             return data;
         });
+
+        this._runMiddleware('after', 'set', { ...context, finalData: this.cache });
+        return result;
     }
 
     async delete(path) {
+        let context = { path };
+        context = this._runMiddleware('before', 'delete', context);
+
         let deleted = false;
-        await this._atomicWrite((data) => {
-            deleted = _.unset(data, path);
+        const result = await this._atomicWrite((data) => {
+            deleted = _.unset(data, context.path);
             return data;
         });
+
+        this._runMiddleware('after', 'delete', { ...context, finalData: this.cache });
         return deleted;
     }
 
     async push(path, ...items) {
         if (items.length === 0) return;
-        return this._atomicWrite((data) => {
-            const arr = _.get(data, path);
+        
+        let context = { path, items };
+        context = this._runMiddleware('before', 'push', context);
+
+        const result = await this._atomicWrite((data) => {
+            const arr = _.get(data, context.path);
             const targetArray = Array.isArray(arr) ? arr : [];
-            items.forEach((item) => {
+            context.items.forEach((item) => {
                 if (!targetArray.some((existing) => _.isEqual(existing, item))) {
                     targetArray.push(item);
                 }
             });
-            _.set(data, path, targetArray);
+            _.set(data, context.path, targetArray);
             return data;
         });
+
+        this._runMiddleware('after', 'push', { ...context, finalData: this.cache });
+        return result;
     }
 
     async pull(path, ...itemsToRemove) {
         if (itemsToRemove.length === 0) return;
-        return this._atomicWrite((data) => {
-            const arr = _.get(data, path);
+
+        let context = { path, itemsToRemove };
+        context = this._runMiddleware('before', 'pull', context);
+
+        const result = await this._atomicWrite((data) => {
+            const arr = _.get(data, context.path);
             if (Array.isArray(arr)) {
-                _.pullAllWith(arr, itemsToRemove, _.isEqual);
+                _.pullAllWith(arr, context.itemsToRemove, _.isEqual);
             }
             return data;
         });
+        
+        this._runMiddleware('after', 'pull', { ...context, finalData: this.cache });
+        return result;
     }
 
     async transaction(transactionFn) {

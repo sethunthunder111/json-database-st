@@ -1,6 +1,6 @@
 {
   "name": "json-database-st",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "A simple, promise-based JSON file database for Node.js with atomic operations and lodash integration.",
   "main": "JSONDatabase.js",
   "scripts": {
@@ -30,7 +30,6 @@
   },
   "homepage": "https://github.com/sethunthunder111/json-database-st#readme",
   "dependencies": {
-    "json-database-st": "^1.0.0",
     "lodash": "^4.17.21",
     "proper-lockfile": "^4.1.2"
   },

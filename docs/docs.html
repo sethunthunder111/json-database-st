@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Documentation | json-database-st</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <!-- Prism.js syntax highlighting -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs/themes/prism-tomorrow.min.css" />
+  <style>
+    :root{
+      --bg:#0a0a0b; --surface:#111113; --surface-2:#0f1013; --muted:#1e1e22;
+      --text:#ffffff; --sub:#94a3b8; --primary:#00ff88; --primary-10:rgba(0,255,136,.10);
+      --outline:#26262b; --radius:18px; --shadow-sm:0 6px 18px rgba(0,0,0,.25);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Plus Jakarta Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--text);background:var(--bg);
+         background-image:radial-gradient(60rem 60rem at -10% -10%, rgba(0,255,136,.12), transparent 60%),
+                          radial-gradient(70rem 70rem at 120% 120%, rgba(102,126,234,.14), transparent 60%),
+                          linear-gradient(180deg, #0a0a0b 0%, #0b0c10 35%, #0a0a0b 100%);
+    }
+    .container{max-width:1200px;margin:0 auto;padding:0 24px}
+    nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.75);backdrop-filter:blur(18px) saturate(140%);border-bottom:1px solid var(--outline)}
+    .nav-content{display:flex;align-items:center;justify-content:space-between;padding:16px 0}
+    .brand{display:flex;gap:12px;align-items:center;color:var(--text);text-decoration:none}
+    .logo{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg, var(--primary), #00c173);font-weight:800;color:#06120b}
+    .nav-links{display:flex;gap:8px}
+    .nav-link{color:var(--sub);text-decoration:none;padding:8px 14px;border-radius:12px}
+    .nav-link:hover{background:var(--surface)}
+    .nav-link.active{color:var(--primary);background:var(--primary-10)}
+
+    header.hero{padding:64px 0 24px}
+    h1{font-size:clamp(30px,5.6vw,56px);line-height:1.06;font-weight:800;letter-spacing:-.02em;margin-bottom:10px}
+    .subtitle{color:var(--sub);font-size:18px;max-width:860px}
+
+    .layout{display:grid;grid-template-columns:260px 1fr;gap:24px}
+    .sidebar{position:sticky;top:76px;align-self:start}
+    .toc{background:var(--surface);border:1px solid var(--outline);border-radius:14px;padding:14px}
+    .toc a{display:block;color:var(--sub);text-decoration:none;padding:8px 10px;border-radius:10px;font-size:14px}
+    .toc a:hover{background:var(--surface-2);color:var(--text)}
+
+    .card{background:linear-gradient(180deg, var(--surface-2), var(--surface));border:1px solid var(--outline);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow-sm);margin-bottom:18px}
+    .card h2{font-size:22px;margin-bottom:8px}
+    .card h3{font-size:18px;margin:10px 0 6px}
+    .note{color:var(--sub);font-size:14px}
+
+    pre{background:var(--muted);border:1px solid var(--outline);padding:16px;border-radius:12px;overflow:auto;font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;font-size:13.5px;line-height:1.6}
+    code{font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
+
+    ul{margin-left:18px;color:var(--sub);line-height:1.8}
+    p{color:var(--sub);line-height:1.8}
+
+    @media (max-width:980px){ .layout{grid-template-columns:1fr} .sidebar{position:static} }
+    /* Mobile tweaks */
+    @media (max-width:820px){
+      .container{padding:0 16px}
+      .nav-content{flex-wrap:wrap;gap:8px}
+      .nav-links{flex-wrap:wrap;justify-content:center;width:100%}
+      header.hero{padding:44px 0 16px}
+      .card{padding:16px}
+      pre{font-size:12.5px}
+      .toc{position:static}
+    }
+    @media (max-width:560px){
+      .logo{width:36px;height:36px}
+      .nav-link{padding:8px 10px;font-size:14px}
+      h1{font-size:26px}
+      .subtitle{font-size:15px}
+      .toc a{padding:6px 8px}
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="container nav-content">
+      <a class="brand" href="./index.html"><div class="logo">DB</div><div style="font-weight:800">json-database-st</div></a>
+      <div class="nav-links">
+        <a class="nav-link" href="./index.html">Home</a>
+        <a class="nav-link active" href="./docs.html">Documentation</a>
+        <a class="nav-link" href="./benchmarks.html">Benchmarks</a>
+        <a class="nav-link" href="https://github.com/sethunthunder111/json-database-st">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="container">
+      <h1>Documentation</h1>
+      <p class="subtitle">Secure, indexed, single-file JSON database for Node.js. AES-256-GCM encryption, atomic writes, indexes, schema validation, transactions, batch ops, and middleware — all in a simple async API.</p>
+    </div>
+  </header>
+
+  <main class="container layout">
+    <aside class="sidebar">
+      <nav class="toc">
+        <a href="#install">Install</a>
+        <a href="#quickstart">Quickstart</a>
+        <a href="#options">Options</a>
+        <a href="#api">API</a>
+        <a href="#security">Security</a>
+        <a href="#schema">Schema validation</a>
+        <a href="#indexing">Indexing</a>
+        <a href="#transactions">Transactions</a>
+        <a href="#batch">Batch</a>
+        <a href="#arrays">Array helpers</a>
+        <a href="#middleware">Middleware</a>
+        <a href="#events">Events</a>
+        <a href="#errors">Error types</a>
+        <a href="#concurrency">Concurrency & Locking</a>
+        <a href="#tips">Tips & Limits</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+    </aside>
+
+    <section>
+      <div id="install" class="card">
+        <h2>Install</h2>
+        <pre><code class="language-bash">npm install json-database-st lodash</code></pre>
+        <p class="note">Requires Node.js ≥ 14.</p>
+      </div>
+
+      <div id="quickstart" class="card">
+        <h2>Quickstart</h2>
+        <pre><code class="language-javascript">// CommonJS
+const JSONDatabase = require('json-database-st');
+const path = require('path');
+
+const db = new JSONDatabase(path.join(__dirname, 'data.json'), {
+  // Generate once and store securely (64 hex chars → 32 bytes)
+  // encryptionKey: require('crypto').randomBytes(32).toString('hex'),
+  indices: [ { name: 'user-email', path: 'users', field: 'email', unique: true } ]
+});
+
+await db.set('users.alice', { email: 'alice@example.com', name: 'Alice' });
+const alice = await db.findByIndex('user-email', 'alice@example.com');
+console.log(alice);
+
+await db.close();</code></pre>
+        <h3 style="margin-top:12px">ESM usage</h3>
+        <pre><code class="language-javascript">// In ESM modules, require via createRequire
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const JSONDatabase = require('json-database-st');</code></pre>
+      </div>
+
+      <div id="options" class="card">
+        <h2>Constructor & Options</h2>
+        <pre><code class="language-javascript">new JSONDatabase(filename, {
+  encryptionKey: undefined,            // string | undefined — 64 hex chars (32 bytes)
+  prettyPrint: false,                   // bool — pretty JSON when not encrypted
+  writeOnChange: true,                  // bool — skip disk write if unchanged
+  schema: null,                         // object with safeParse(data)
+  indices: []                           // [{ name, path, field, unique? }]
+})</code></pre>
+        <ul>
+          <li><strong>encryptionKey</strong>: 64‑char hex → AES‑256‑GCM at rest. Wrong key or tamper → secure failure.</li>
+          <li><strong>schema</strong>: Provide a Zod/Joi‑like object with <code>safeParse</code>. Rejects writes if invalid.</li>
+          <li><strong>indices</strong>: Define fast lookups via <code>findByIndex()</code>. Optional <code>unique</code> constraint.</li>
+        </ul>
+      </div>
+
+      <div id="api" class="card">
+        <h2>API</h2>
+        <pre><code class="language-javascript">// read
+await db.get(path?, defaultValue?)           // path optional → full cache
+await db.has(path)                           // boolean
+await db.find(collectionPath, predicate)     // lodash predicate
+await db.findByIndex(indexName, value)       // O(1) lookup
+
+// write
+await db.set(path, value)
+await db.delete(path)                        // returns true even if path missing
+await db.push(path, ...items)                // unique by deep equality
+await db.pull(path, ...itemsToRemove)        // deep-equality removal
+
+// atomic workflows
+await db.transaction(async (data) => {       // must return data
+  data.count = (data.count||0) + 1; return data;
+})
+
+await db.batch([
+  { type:'set', path:'users.alice', value:{ name:'Alice' } },
+  { type:'push', path:'tags', values:['a','b'] },
+  { type:'delete', path:'old.key' }
+], { stopOnError:false })
+
+// lifecycle
+db.getStats()                                // { reads,writes,cacheHits }
+await db.close()</code></pre>
+        <h3>Method reference</h3>
+        <ul>
+          <li><strong>get(path?, defaultValue?)</strong>: Returns value at path or entire cache; never writes.</li>
+          <li><strong>set(path, value)</strong>: Writes value; validates schema; updates indices; emits <code>write</code>/<code>change</code>.</li>
+          <li><strong>has(path)</strong>: Boolean presence check.</li>
+          <li><strong>delete(path)</strong>: Removes path; resolves to <code>true</code> even if already missing.</li>
+          <li><strong>push(path, ...items)</strong>: Creates array if missing; deep-unique append.</li>
+          <li><strong>pull(path, ...items)</strong>: Deep-equality filter removal.</li>
+          <li><strong>find(collectionPath, predicate)</strong>: Lodash-style predicate over object/array.</li>
+          <li><strong>findByIndex(indexName, value)</strong>: O(1) lookup into pre-built index.</li>
+          <li><strong>transaction(fn)</strong>: Single atomic rewrite; returning <code>undefined</code> aborts.</li>
+          <li><strong>batch(ops, { stopOnError })</strong>: Executes ops in one rewrite; logs errors unless <code>stopOnError</code>.</li>
+          <li><strong>getStats()</strong>: Shallow copy of counters.</li>
+          <li><strong>close()</strong>: Flushes outstanding writes, clears cache and indices.</li>
+        </ul>
+      </div>
+
+      <div id="security" class="card">
+        <h2>Security</h2>
+        <ul>
+          <li><strong>Encryption at rest</strong>: AES‑256‑GCM with random IV and auth tag. Tamper or wrong key → secure failure.</li>
+          <li><strong>Key format</strong>: Provide 64‑char hex string (32 bytes). Store in environment variables.</li>
+          <li><strong>Path traversal protection</strong>: DB file must resolve under <code>process.cwd()</code>.</li>
+          <li><strong>Crash recovery</strong>: Atomic write via <code>.tmp</code> + rename; on boot, recovers if temp file exists.</li>
+        </ul>
+        <pre><code class="language-javascript">// Generate a secure key once
+const key = require('crypto').randomBytes(32).toString('hex');
+console.log(key);</code></pre>
+      </div>
+
+      <div id="schema" class="card">
+        <h2>Schema validation</h2>
+        <p>Pass any object exposing <code>safeParse(data)</code>. On failure, throws <code>ValidationError</code> and aborts the write.</p>
+        <pre><code class="language-javascript">const { z } = require('zod');
+const schema = z.object({ users: z.record(z.object({ email: z.string().email(), name: z.string() })) });
+const db = new JSONDatabase('db.json', { schema });
+
+await db.set('users.alice', { email: 'alice@example.com', name: 'Alice' });</code></pre>
+      </div>
+
+      <div id="indexing" class="card">
+        <h2>Indexing</h2>
+        <pre><code class="language-javascript">const db = new JSONDatabase('db.json', {
+  indices: [ { name:'user-email', path:'users', field:'email', unique:true } ]
+});
+
+await db.set('users.alice', { email:'alice@example.com', name:'Alice' });
+await db.set('users.bob',   { email:'bob@example.com',   name:'Bob'   });
+
+const user = await db.findByIndex('user-email', 'bob@example.com');
+// → { email:'bob@example.com', name:'Bob' }</code></pre>
+        <p class="note">Unique violations throw <code>IndexViolationError</code>.</p>
+        <ul>
+          <li>Indexes map field values to object keys under <code>path</code> for O(1) reads.</li>
+          <li>Indices rebuild on init and update incrementally on writes.</li>
+          <li>Define multiple indices by adding more entries to <code>indices</code>.</li>
+        </ul>
+      </div>
+
+      <div id="transactions" class="card">
+        <h2>Transactions</h2>
+        <pre><code class="language-javascript">await db.transaction((data) => {
+  data.balance = (data.balance || 0) + 100;
+  return data; // returning undefined aborts the write
+});</code></pre>
+        <ul>
+          <li>Receives a deep clone of current data; must return the new data object.</li>
+          <li>All validations and index updates happen once per transaction.</li>
+        </ul>
+      </div>
+
+      <div id="batch" class="card">
+        <h2>Batch operations</h2>
+        <pre><code class="language-javascript">await db.batch([
+  { type:'set', path:'accounts.a', value:100 },
+  { type:'set', path:'accounts.b', value:200 },
+  { type:'push', path:'log', values:['boot'] }
+], { stopOnError: false });</code></pre>
+        <ul>
+          <li>Runs all operations in-memory, then performs a single atomic write.</li>
+          <li><strong>stopOnError</strong>: when true, throws on first invalid op; when false, logs errors and continues.</li>
+        </ul>
+      </div>
+
+      <div id="arrays" class="card">
+        <h2>Array helpers</h2>
+        <pre><code class="language-javascript">await db.set('tags', ['a','b']);
+await db.push('tags', 'b', 'c');     // → ['a','b','c'] (unique)
+await db.pull('tags', 'a');          // → ['b','c']</code></pre>
+      </div>
+
+      <div id="middleware" class="card">
+        <h2>Middleware</h2>
+        <p>Register hooks on <code>before</code>/<code>after</code> for operations <code>set|delete|push|pull|transaction|batch</code>.</p>
+        <pre><code class="language-javascript">db.before('set', 'users.*', (ctx) => {      // wildcard match
+  ctx.value.updatedAt = Date.now();
+  return ctx;                                // must return a context object
+});
+
+db.after('set', 'users.*', ({ path, value, finalData }) => {
+  console.log('wrote', path, value);
+});</code></pre>
+        <ul>
+          <li><strong>before</strong> must return a context object; returning falsy aborts the operation.</li>
+          <li>Patterns use <code>*</code> to match a single path segment: <code>users.*.name</code>.</li>
+        </ul>
+      </div>
+
+      <div id="events" class="card">
+        <h2>Events</h2>
+        <pre><code class="language-javascript">db.on('write',  (e) => console.log('write', e));     // { filename, timestamp }
+db.on('change', (e) => console.log('change', e));    // { oldValue, newValue }
+db.on('error',  (e) => console.error('db error', e));</code></pre>
+      </div>
+
+      <div id="errors" class="card">
+        <h2>Error types</h2>
+        <ul>
+          <li><code>DBInitializationError</code> — file parse/init failures</li>
+          <li><code>TransactionError</code> — transaction fn returned <code>undefined</code></li>
+          <li><code>ValidationError</code> — schema.safeParse failed</li>
+          <li><code>IndexViolationError</code> — unique index violated</li>
+          <li><code>SecurityError</code> — path traversal or bad encryption key</li>
+        </ul>
+        <pre><code class="language-javascript">try {
+  await db.set('users.dupe', { email: 'alice@example.com' });
+} catch (err) {
+  if (err.name === 'IndexViolationError') {
+    // handle unique violation
+  }
+}</code></pre>
+      </div>
+
+      <div id="concurrency" class="card">
+        <h2>Concurrency & Locking</h2>
+        <p>Single Node.js process per DB file is recommended. Writes use an OS‑level advisory lock via <code>proper-lockfile</code> to serialize access and an atomic <code>.tmp</code> + <code>rename</code> strategy.</p>
+        <ul>
+          <li>Parallel writes in one process are queued.</li>
+          <li>Multi‑process writes to the same file are not supported.</li>
+        </ul>
+      </div>
+
+      <div id="tips" class="card">
+        <h2>Tips & Limits</h2>
+        <ul>
+          <li>Loads entire file into memory on init — size accordingly.</li>
+          <li>Optimized for single-process usage per DB file.</li>
+          <li>Batch updates to reduce rewrite cost on large files.</li>
+          <li>Keep hot lookups in indexes; avoid wide blobs for per-request reads.</li>
+        </ul>
+      </div>
+
+      <div id="faq" class="card">
+        <h2>FAQ</h2>
+        <h3>How do I rotate the encryption key?</h3>
+        <p>Create a new instance pointing to a new file with the new key, read all data from the old DB, write to the new one, then swap files.</p>
+        <h3>Can I define multiple indices?</h3>
+        <p>Yes. Provide multiple entries in <code>indices</code>. Each one is maintained independently.</p>
+        <h3>Does <code>get()</code> hit the disk?</h3>
+        <p>No. Data is cached in memory after initialization.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer style="border-top:1px solid var(--outline);padding:32px 0;margin-top:28px;color:var(--sub);text-align:center">
+    <div class="container">json-database-st • MIT • <a href="https://github.com/sethunthunder111/json-database-st" style="color:var(--primary);text-decoration:none">GitHub</a></div>
+  </footer>
+  <!-- Prism.js scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/prismjs/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs/components/prism-javascript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs/components/prism-bash.min.js"></script>
+</body>
+</html>

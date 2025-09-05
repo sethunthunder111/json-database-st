@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Performance Benchmarks | json-database-st</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --bg:#0a0a0b; --surface:#101113; --surface-2:#121316;
+      --text:#ffffff; --sub:#9aa4b2;
+      --primary:#00ff88; --accent:#ff0066; --warn:#ffaa00;
+      --outline:#232429; --radius:16px; --rsm:12px;
+      --section-gap:26px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--text);
+      font-family:'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(1200px 700px at 15% 12%, rgba(0,255,136,0.08), transparent 45%),
+        radial-gradient(900px 520px at 90% 85%, rgba(255,0,102,0.05), transparent 50%),
+        linear-gradient(180deg, #0a0a0b 0%, #0d0e10 60%, #0a0a0b 100%);
+    }
+    .container{max-width:1200px;margin:0 auto;padding:36px 28px} /* more breathing room */
+
+    /* Nav */
+    nav{position:sticky;top:0;z-index:50;padding:16px 0;background:rgba(10,10,11,.55);backdrop-filter:blur(8px);border-bottom:1px solid var(--outline)}
+    .nav-row{display:flex;align-items:center;justify-content:space-between}
+    .brand{display:flex;gap:12px;align-items:center;text-decoration:none;color:var(--text)}
+    .logo{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#00ff88,#00cc6a);display:flex;align-items:center;justify-content:center;color:#04170a;font-weight:800;box-shadow:0 0 40px rgba(0,255,136,0.18)}
+    .nav-links{display:flex;gap:10px}
+    .nav-links a{color:var(--sub);text-decoration:none;padding:8px 12px;border-radius:10px}
+    .nav-links a.active{background:rgba(0,255,136,0.08);color:var(--primary)}
+
+    /* Hero */
+    .hero{text-align:center;padding:42px 0 8px}
+    h1{font-size:clamp(28px,4.4vw,48px);letter-spacing:-0.02em;margin:6px 0 10px;font-weight:800}
+    .subtitle{color:var(--sub);max-width:900px;margin:0 auto 0}
+    .badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+    .badge{background:var(--surface-2);border:1px solid rgba(255,255,255,0.06);padding:6px 12px;border-radius:999px;color:var(--primary);font-weight:800}
+
+    /* Cards + charts */
+    .card{background:var(--surface);border:1px solid var(--outline);border-radius:var(--radius);padding:22px;margin-top:var(--section-gap)}
+    .charts{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+    .chart-card{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border:1px solid rgba(255,255,255,0.04);border-radius:14px;padding:18px;height:400px}
+    .chart-title{font-weight:800;margin-bottom:10px}
+
+    /* Spec cards */
+    .specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:var(--section-gap)}
+    .spec{display:flex;gap:14px;align-items:center;background:var(--surface-2);border:1px solid var(--outline);border-radius:16px;padding:18px}
+    .spec .icon{width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800}
+    .i1{background:linear-gradient(135deg,#00ff88,#00cc6a);color:#04170a}
+    .i2{background:linear-gradient(135deg,#667eea,#764ba2);color:#0b0711}
+    .i3{background:linear-gradient(135deg,#ffd166,#ff944d);color:#241100}
+    .spec .title{font-weight:800}
+    .spec .sub{color:var(--sub);font-size:13px}
+
+    /* Explanations + note */
+    .notes{color:var(--sub);line-height:1.7}
+    .note-warning{margin-top:12px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.22);padding:12px;border-radius:12px}
+
+    /* Table */
+    .table{width:100%;border-collapse:collapse;margin-top:12px}
+    thead th{font-size:13px;color:var(--sub);font-weight:800;text-transform:uppercase;letter-spacing:.4px;background:linear-gradient(180deg,#121316,#0f1013);border-bottom:1px solid var(--outline)}
+    th,td{padding:14px 16px;text-align:left;border-bottom:1px solid var(--outline)}
+    tbody tr:hover{background:rgba(255,255,255,0.02)}
+    .value-good{color:var(--primary);font-weight:800}
+    .value-warning{color:var(--warn);font-weight:800}
+    .value-neutral{color:var(--text);font-weight:700}
+    tbody td:first-child{position:relative;padding-left:22px}
+    tbody td:first-child::before{content:'';position:absolute;left:8px;top:14px;width:6px;height:20px;border-radius:3px;background:rgba(255,255,255,0.06)}
+    tbody tr:nth-child(1) td:first-child::before{background:linear-gradient(180deg,#00ff88,#00cc6a)}
+    tbody tr:nth-child(2) td:first-child::before{background:linear-gradient(180deg,#667eea,#764ba2)}
+    tbody tr:nth-child(3) td:first-child::before{background:linear-gradient(180deg,#ffd166,#ff944d)}
+
+    /* Competition section */
+    .comp-note{color:var(--sub);margin-top:10px}
+    .mini{font-size:13px;color:var(--sub)}
+    footer{margin-top:40px;color:var(--sub);text-align:center}
+    @media (max-width:900px){ .charts{grid-template-columns:1fr} }
+    /* Mobile tweaks */
+    @media (max-width:820px){
+      .container{padding:20px 14px}
+      .nav-row{flex-wrap:wrap;gap:8px}
+      .nav-links{flex-wrap:wrap;justify-content:center;width:100%;gap:6px}
+      .chart-card{height:280px}
+      .card{padding:16px}
+      .specs{gap:12px}
+    }
+    @media (max-width:560px){
+      .logo{width:36px;height:36px}
+      .nav-links a{padding:8px 10px;font-size:14px}
+      .charts{gap:12px}
+      .badge{padding:5px 10px;font-size:12px}
+      .spec{padding:12px}
+      .spec .icon{width:44px;height:44px}
+      th,td{padding:8px 10px}
+      h1{font-size:24px}
+      .subtitle{font-size:14px}
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="container nav-row" style="padding-top:14px;padding-bottom:14px">
+      <a class="brand" href="./index.html">
+        <div class="logo">DB</div>
+        <div>
+          <div style="font-weight:800">json-database-st <span style="color:var(--primary)">• Benchmarks</span></div>
+          <div style="color:var(--sub);font-size:13px">Readable, honest metrics</div>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="./index.html">Home</a>
+        <a href="./docs.html">Documentation</a>
+        <a class="active" href="./benchmarks.html">Benchmarks</a>
+        <a href="https://github.com/sethunthunder111/json-database-st">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <header class="hero">
+      <div class="badges">
+        <span class="badge">⚡ Sub-millisecond reads</span>
+        <span class="badge">🔒 ACID-safe single file</span>
+        <span class="badge">📦 Lightweight</span>
+      </div>
+      <h1>Enterprise-grade performance (with tradeoffs)</h1>
+      <p class="subtitle">
+        Benchmarks show exceptional indexed-read performance and predictable write characteristics.
+        Numbers below come from our benchmark runs; explanations + limitations right after the graphs.
+      </p>
+    </header>
+
+    <!-- Charts ONLY -->
+    <section class="card" aria-label="bench graphs">
+      <div class="charts">
+        <div class="chart-card">
+          <div class="chart-title">Read Performance Scaling</div>
+          <canvas id="readChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Write Performance & Updates</div>
+          <canvas id="writeChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Spec cards under the graphs -->
+    <section class="specs" aria-label="system specs">
+      <div class="spec">
+        <div class="icon i1">⚙️</div>
+        <div><div class="title">Test Machine</div><div class="sub">Intel i5-8350U • 8GB RAM • NVMe SSD</div></div>
+      </div>
+      <div class="spec">
+        <div class="icon i2">🧪</div>
+        <div><div class="title">Measurement</div><div class="sub">High-res timers (<code>process.hrtime.bigint()</code>), isolated Node process</div></div>
+      </div>
+      <div class="spec">
+        <div class="icon i3">📊</div>
+        <div><div class="title">Workload</div><div class="sub">50k / 100k / 1M datasets • indexed reads • bulk write • single-record update</div></div>
+      </div>
+    </section>
+
+    <!-- Explanations + reference-only note -->
+    <section class="card">
+      <h3 style="margin-bottom:10px">Quick analysis</h3>
+      <div class="notes">
+        • <strong>Indexed reads</strong> are effectively O(1) and stay sub-ms as data grows — clutch for read-heavy stuff (caches, sessions, CLIs).<br>
+        • <strong>Single-record updates</strong> rewrite the file to stay ACID, so cost scales with file size — update-heavy apps should prefer a write-optimized DB.<br>
+        • <strong>Initial bulk writes</strong> are tuned for ingestion and scale predictably with dataset size.
+      </div>
+      <div class="note-warning"><strong>Reference-only:</strong> these results reflect our specific machine, OS and dataset shape. Yours can differ. Treat this as guidance, not a guarantee.</div>
+    </section>
+
+    <!-- Fill with more helpful content -->
+    <section class="card">
+      <h3 style="margin-bottom:8px">When to use it</h3>
+      <p class="notes">
+        Use <strong>json-database-st</strong> when your workload is ≥95% reads with occasional updates, you want ultra-fast local lookups,
+        and deploying a server is overkill. Think config stores, session/state caches, local CLIs, embedded tools, or ephemeral micro-services.
+      </p>
+      <h3 style="margin:18px 0 8px">When not to</h3>
+      <p class="notes">
+        If you do frequent single-record updates on big files, or need multi-writer concurrency, pick a write-optimized engine (SQLite, server DB).
+        If you need full-text search, complex queries, or replication, consider PouchDB/CouchDB or an embedded analytic DB.
+      </p>
+      <h3 style="margin:18px 0 8px">Tuning tips</h3>
+      <ul class="notes" style="margin-left:16px">
+        <li>Batch writes where possible (group updates → rewrite once).</li>
+        <li>Keep hot keys in the index; avoid wide JSON blobs for per-request reads.</li>
+        <li>Prefer append-style change logs + periodic compaction for heavy ingest sessions.</li>
+        <li>Put the DB file on NVMe/SSD; spinning disks will hurt update latency.</li>
+      </ul>
+    </section>
+
+    <!-- Colored table -->
+    <section class="card">
+      <h3 style="margin-bottom:10px">Raw numbers</h3>
+      <div style="overflow:auto">
+        <table class="table" aria-label="raw benchmark numbers">
+          <thead>
+            <tr>
+              <th>Dataset Size</th>
+              <th>File Size</th>
+              <th>Initial Write (ms)</th>
+              <th>Indexed Read (ms)</th>
+              <th>Single Update (ms)</th>
+              <th>Read Efficiency</th>
+            </tr>
+          </thead>
+          <tbody id="benchTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Competition (REFERENCE) -->
+    <section class="card">
+      <h3>Competition — reference patterns</h3>
+      <p class="comp-note">
+        These charts compare <em>expected complexity trends</em> for offline JSON-style stores. Values are
+        <strong>normalized (relative)</strong>, not from our benchmark runs. They’re for orientation, not proof.
+      </p>
+      <div class="charts" style="margin-top:12px">
+        <div class="chart-card">
+          <div class="chart-title">Reference: Read pattern comparison (normalized)</div>
+          <canvas id="compReadChart"></canvas>
+          <div class="mini">Lower is better • 50k set = 1× baseline</div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Reference: Update pattern comparison (normalized)</div>
+          <canvas id="compWriteChart"></canvas>
+          <div class="mini">Lower is better • relative cost by dataset size</div>
+        </div>
+      </div>
+      <p class="mini" style="margin-top:10px">
+        Labels: <strong>json-database-st</strong> (indexed O(1)); <strong>LowDB / plain JSON</strong> (linear scan O(n));
+        <strong>NeDB / PouchDB (indexed)</strong> (≈O(log n)). Exact numbers vary by disk, cache, GC, and query shape.
+      </p>
+    </section>
+
+    <!-- Market position table under everything -->
+    <section class="card">
+      <h3>Market Position & Alternatives</h3>
+      <p class="comp-note">For context only — general roles, not strict benchmarks. Pick based on workload.</p>
+      <table class="table" style="margin-top:8px">
+        <thead>
+          <tr><th>Solution</th><th>Architecture</th><th>Strengths</th><th>Best for</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>json-database-st</strong></td><td>Single-file JSON + index</td><td class="value-good">Sub-ms reads • simple deploy</td><td>Read-heavy microservices, CLIs, embedded</td></tr>
+          <tr><td>LowDB</td><td>JSON wrapper (scan)</td><td>Simplicity</td><td>Tiny datasets, simple configs</td></tr>
+          <tr><td>NeDB (archived)</td><td>Document store + B-tree idx</td><td>Indexed queries</td><td>Small apps needing simple indexing</td></tr>
+          <tr><td>PouchDB</td><td>Doc store + indexes + sync</td><td>Offline-first, replication</td><td>PWAs needing CouchDB sync</td></tr>
+          <tr><td>Redis (server)</td><td>In-memory KV</td><td class="value-good">Ultra-fast</td><td>Caching/realtime (server required)</td></tr>
+          <tr><td>DuckDB</td><td>Embedded columnar</td><td>Analytics</td><td>On-device OLAP-ish queries</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer style="margin-top:28px">
+      Benchmarks run on the listed machine with high-res timers. Values may vary on your setup.
+    </footer>
+  </main>
+
+  <script>
+  // ===== Data (from your benchmark doc) =====
+  const BENCH = {
+    runs: [
+      { records: 50000,   fileSizeMB: 3.96,  initialWriteMs: 216.12,   indexedReadMs: 0.97, singleUpdateMs: 819.75,  readEfficiency: 99.8 },
+      { records: 100000,  fileSizeMB: 7.94,  initialWriteMs: 400.87,   indexedReadMs: 0.25, singleUpdateMs: 950.20,  readEfficiency: 99.9 },
+      { records: 1000000, fileSizeMB: 82.28, initialWriteMs: 3271.48,  indexedReadMs: 0.07, singleUpdateMs: 9421.12, readEfficiency: 99.99 }
+    ]
+  };
+
+  // ===== Populate table =====
+  (function renderTable(){
+    const tbody = document.getElementById('benchTableBody');
+    tbody.innerHTML = '';
+    BENCH.runs.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.records.toLocaleString()} records</td>
+        <td>${r.fileSizeMB} MB</td>
+        <td class="value-neutral">${r.initialWriteMs.toLocaleString()} ms</td>
+        <td class="${r.indexedReadMs < 1 ? 'value-good' : 'value-neutral'}">${r.indexedReadMs} ms</td>
+        <td class="${r.singleUpdateMs > 1000 ? 'value-warning' : 'value-neutral'}">${r.singleUpdateMs.toLocaleString()} ms</td>
+        <td class="value-good">${r.readEfficiency}%</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  })();
+
+  // ===== Chart helpers =====
+  function destroyIfExists(canvasId){
+    if (typeof Chart === 'undefined') return;
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    const c = Chart.getChart(el);
+    if (c) c.destroy();
+  }
+
+  const valueLabels = {
+    id:'valueLabels',
+    afterDatasetsDraw(chart){
+      const {ctx} = chart;
+      ctx.save();
+      ctx.fillStyle = '#cfd6de';
+      ctx.font = '12px "Plus Jakarta Sans", system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      chart.data.datasets.forEach((ds, dsi) => {
+        const meta = chart.getDatasetMeta(dsi);
+        meta.data.forEach((el, i) => {
+          const val = ds.data[i]; if (val == null) return;
+          const p = el.getProps(['x','y','base'], true);
+          const isBar = meta.type === 'bar';
+          const x = p.x, y = (isBar ? Math.min(p.y, p.base) : p.y) - 6;
+          ctx.fillText(String(val), x, y);
+        });
+      });
+      ctx.restore();
+    }
+  };
+
+  // ===== Draw charts =====
+  document.addEventListener('DOMContentLoaded', () => {
+    if (typeof Chart === 'undefined') { console.error('Chart.js not loaded'); return; }
+    Chart.register(valueLabels);
+    Chart.defaults.color = '#9aa4b2';
+    Chart.defaults.font.family = "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif";
+
+    const labels = BENCH.runs.map(r => (r.records>=1_000_000 ? '1M' : (r.records/1000)+'k'));
+
+    // READ
+    destroyIfExists('readChart');
+    const rctx = document.getElementById('readChart').getContext('2d');
+    new Chart(rctx, {
+      type:'line',
+      data:{ labels, datasets:[{
+        label:'json-database-st (indexed)',
+        data: BENCH.runs.map(r=>r.indexedReadMs),
+        borderColor:'#00ff88', backgroundColor:'rgba(0,255,136,0.10)',
+        pointBackgroundColor:'#00ff88', pointRadius:4, borderWidth:2, tension:0.28
+      }]},
+      options:{
+        maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom'}},
+        scales:{ x:{title:{display:true,text:'Dataset size'}}, y:{type:'linear',title:{display:true,text:'Latency (ms)'}}},
+        interaction:{mode:'index',intersect:false}
+      }
+    });
+
+    // WRITE
+    destroyIfExists('writeChart');
+    const wctx = document.getElementById('writeChart').getContext('2d');
+    new Chart(wctx, {
+      type:'bar',
+      data:{ labels, datasets:[
+        { label:'Initial Write (ms)', data: BENCH.runs.map(r=> r.initialWriteMs), backgroundColor:'#667eea' },
+        { label:'Single Update (ms)', data: BENCH.runs.map(r=> r.singleUpdateMs), backgroundColor:'#ffaa00' }
+      ]},
+      options:{ maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{ y:{title:{display:true,text:'Time (ms)'}} } }
+    });
+
+    // ===== Competition (REFERENCE ONLY) =====
+    const sizes = [ 50000, 100000, 1000000 ];
+    const base = sizes[0];
+    const o1 = sizes.map(_ => 1);                        // O(1)
+    const on = sizes.map(s => Number((s/base).toFixed(2))); // O(n)
+    // "log n" → normalize by log2(size)/log2(base)
+    const log2 = x => Math.log2(x);
+    const ologn = sizes.map(s => Number((log2(s)/log2(base)).toFixed(2)));
+
+    // Comp Read (normalized)
+    destroyIfExists('compReadChart');
+    const cr = document.getElementById('compReadChart').getContext('2d');
+    new Chart(cr, {
+      type:'line',
+      data:{
+        labels: ['50k','100k','1M'],
+        datasets:[
+          { label:'json-database-st (O(1))', data:o1, borderColor:'#00ff88', backgroundColor:'rgba(0,255,136,.1)', tension:.28, borderWidth:2, pointRadius:3 },
+          { label:'LowDB / plain JSON (O(n))', data:on, borderColor:'#ff0066', backgroundColor:'rgba(255,0,102,.08)', borderDash:[6,4], tension:.28, borderWidth:2, pointRadius:3 },
+          { label:'NeDB / PouchDB (≈O(log n))', data:ologn, borderColor:'#667eea', backgroundColor:'rgba(102,126,234,.10)', tension:.28, borderWidth:2, pointRadius:3 }
+        ]
+      },
+      options:{
+        maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom'}},
+        scales:{ y:{title:{display:true,text:'Relative read cost (×)'}, beginAtZero:true } }
+      }
+    });
+
+    // Comp Write (normalized)
+    // json-database-st rewrites → O(n); Indexed doc stores update index → ~O(log n); append-based → ~constant-ish
+    const rewrite = on;                                   // file rewrite
+    const indexUpd = ologn.map(v => Number((v*1.1).toFixed(2))); // index write ~ slightly > log n
+    const appendish = sizes.map((s,i) => [1,1.05,1.15][i]);      // tiny growth
+
+    destroyIfExists('compWriteChart');
+    const cw = document.getElementById('compWriteChart').getContext('2d');
+    new Chart(cw, {
+      type:'bar',
+      data:{
+        labels:['50k','100k','1M'],
+        datasets:[
+          { label:'json-database-st (rewrite)', data:rewrite, backgroundColor:'#ffaa00' },
+          { label:'Indexed doc store (index update)', data:indexUpd, backgroundColor:'#667eea' },
+          { label:'Append-style (log + compaction)', data:appendish, backgroundColor:'#22c55e' }
+        ]
+      },
+      options:{
+        maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom'}},
+        scales:{ y:{ title:{display:true,text:'Relative update cost (×)'} , beginAtZero:true } }
+      }
+    });
+  });
+  </script>
+</body>
+</html>
