@@ -3,6 +3,7 @@
   "version": "1.0.12",
   "description": "A simple, promise-based JSON file database for Node.js with atomic operations and lodash integration.",
   "main": "JSONDatabase.js",
+  "types": "JSONDatabase.d.ts",
   "scripts": {
     "test": "jest"
   },
