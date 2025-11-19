@@ -30,7 +30,7 @@
   "bugs": {
     "url": "https://github.com/sethunthunder111/json-database-st/issues"
   },
-  "homepage": "https://github.com/sethunthunder111/json-database-st#readme",
+  "homepage": "https://sethunthunder111.github.io/json-database-st/",
   "dependencies": {
     "lodash": "^4.17.21",
     "proper-lockfile": "^4.1.2"
