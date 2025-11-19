@@ -4,7 +4,7 @@
 [![NPM Downloads](https://img.shields.io/npm/dm/json-database-st.svg)](https://www.npmjs.com/package/json-database-st)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Designed for Node.js applications that need data persistence without the complexity of SQL servers.
+A high-performance, lightweight, and secure JSON-based database engine for Node.js. Designed for applications that need reliable data persistence, atomic operations, and encryption without the overhead of a full SQL server.
 
 ## 🚀 Key Features
 
@@ -47,15 +47,11 @@ run();
 
 ## 📖 Documentation
 
-Full documentation is available in the `website/docs.html` file included in this repository.
-
-- Use `encryptionKey` for all financial records.
-- Use `paginate()` for transaction history lists.
-- Use `createSnapshot('daily')` for automated backups.
+Full documentation, API references, and benchmarks are available on the **[Home Page](https://sethunthunder111.github.io/json-database-st/)**.
 
 ## 🤝 Contributing
 
-Built by **SethunThunder**
+Built by **SethunThunder**.
 
 ## 🚀 Performance (v2.0)
 

@@ -1,6 +1,6 @@
 {
   "name": "json-database-st",
-  "version": "2.0.0",
+  "version": "2.0.02",
   "description": "A simple, promise-based JSON file database for Node.js with atomic operations and lodash integration.",
   "main": "JSONDatabase.js",
   "types": "JSONDatabase.d.ts",
