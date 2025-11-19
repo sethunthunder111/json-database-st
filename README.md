@@ -61,8 +61,7 @@ This database is optimized for the **ST Financial Engine**.
 
 ## 🤝 Contributing
 
-Built by **SethunThunder** for the ST Empire.
-Laybon Gold 1.5 Assisted.
+Built by **SethunThunder**
 
 ## 🚀 Performance (v2.0)
 
