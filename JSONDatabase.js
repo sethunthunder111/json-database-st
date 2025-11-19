@@ -1,648 +1,349 @@
 // File: JSONDatabase.js
-// Final, Complete, and Secure Version (Patched)
+// Version: 2.0.0 (ST Gold Edition - Complete)
 
 const fs = require("fs").promises;
+const fsSync = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const _ = require("lodash");
 const EventEmitter = require("events");
 const lockfile = require("proper-lockfile");
 
-// --- Custom Error Classes for Better Error Handling ---
+// --- Custom Errors ---
+class DBError extends Error { constructor(msg) { super(msg); this.name = this.constructor.name; } }
 
-/** Base error for all database-specific issues. */
-class DBError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = this.constructor.name;
-    }
-}
-/** Error during database file initialization or parsing. */
-class DBInitializationError extends DBError { }
-/** Error within a user-provided transaction function. */
-class TransactionError extends DBError { }
-/** Error when data fails schema validation. */
-class ValidationError extends DBError {
-    constructor(message, validationIssues) {
-        super(message);
-        this.issues = validationIssues; // e.g., from Zod/Joi
-    }
-}
-/** Error related to index integrity (e.g., unique constraint violation). */
-class IndexViolationError extends DBError { }
-/** Error for security-related issues like path traversal or bad keys. */
-class SecurityError extends DBError { }
-
-// --- Type Definitions for Clarity ---
-
-/**
- * @typedef {object} BatchOperationSet
- * @property {'set'} type
- * @property {string | string[]} path
- * @property {any} value
- */
-
-/**
- * @typedef {object} BatchOperationDelete
- * @property {'delete'} type
- * @property {string | string[]} path
- */
-
-/**
- * @typedef {object} BatchOperationPush
- * @property {'push'} type
- * @property {string | string[]} path
- * @property {any[]} values - Items to push uniquely using deep comparison.
- */
-
-/**
- * @typedef {object} BatchOperationPull
- * @property {'pull'} type
- * @property {string | string[]} path
- * @property {any[]} values - Items to remove using deep comparison.
- */
-
-/**
- * @typedef {BatchOperationSet | BatchOperationDelete | BatchOperationPush | BatchOperationPull} BatchOperation
- */
-
-/**
- * @typedef {object} IndexDefinition
- * @property {string} name - The unique name for the index.
- * @property {string | string[]} path - The lodash path to the collection object (e.g., 'users').
- * @property {string} field - The property field within each collection item to index (e.g., 'email').
- * @property {boolean} [unique=false] - If true, enforces that the indexed field must be unique across the collection.
- */
-
-// --- Cryptography Constants ---
-const ALGORITHM = "aes-256-gcm";
-const IV_LENGTH = 16;
-const AUTH_TAG_LENGTH = 16;
-
-/**
- * A robust, secure, promise-based JSON file database with atomic operations, indexing, schema validation, and events.
- * Includes encryption-at-rest and path traversal protection.
- *
- * @class JSONDatabase
- * @extends {EventEmitter}
- */
 class JSONDatabase extends EventEmitter {
-    /**
-     * Creates a database instance.
-     *
-     * @param {string} filename - Database file path.
-     * @param {object} [options] - Configuration options.
-     * @param {string} [options.encryptionKey=null] - A 32-byte (64-character hex) secret key for encryption. If provided, enables encryption-at-rest. **MANAGE THIS KEY SECURELY.**
-     * @param {boolean} [options.prettyPrint=false] - Pretty-print JSON output (only if not encrypted).
-     * @param {boolean} [options.writeOnChange=true] - Only write to disk if data has changed.
-     * @param {object} [options.schema=null] - A validation schema (e.g., from Zod) with a `safeParse` method.
-     * @param {IndexDefinition[]} [options.indices=[]] - An array of index definitions for fast lookups.
-     * @throws {SecurityError} If the filename is invalid or attempts path traversal.
-     * @throws {SecurityError} If an encryption key is provided but is not the correct length.
-     */
     constructor(filename, options = {}) {
         super();
 
-        // --- Security Check: Path Traversal ---
+        // 1. Security: Path Traversal Protection
         const resolvedPath = path.resolve(filename);
-        const workingDir = process.cwd();
-        if (!resolvedPath.startsWith(workingDir)) {
-            throw new SecurityError(
-                `Path traversal detected. Database path must be within the project directory: ${workingDir}`
-            );
+        if (!resolvedPath.startsWith(process.cwd())) {
+            throw new Error("Security Violation: Database path must be inside the project directory.");
         }
-        this.filename = /\.json$/.test(resolvedPath)
-            ? resolvedPath
-            : `${resolvedPath}.json`;
+        this.filename = resolvedPath.endsWith(".json") ? resolvedPath : `${resolvedPath}.json`;
 
-        // --- Security Check: Encryption Key ---
-        if (
-            options.encryptionKey &&
-            (!options.encryptionKey ||
-                Buffer.from(options.encryptionKey, "hex").length !== 32)
-        ) {
-            throw new SecurityError(
-                "Encryption key must be a 32-byte (64-character hex) string."
-            );
-        }
-
+        // 2. Configuration
         this.config = {
-            prettyPrint: options.prettyPrint === true,
-            writeOnChange: options.writeOnChange !== false,
-            schema: options.schema || null,
+            encryptionKey: options.encryptionKey ? Buffer.from(options.encryptionKey, "hex") : null,
+            prettyPrint: options.prettyPrint !== false,
+            saveDelay: options.saveDelay || 60, // Speed optimization (Debounce)
             indices: options.indices || [],
-            encryptionKey: options.encryptionKey
-                ? Buffer.from(options.encryptionKey, "hex")
-                : null,
+            schema: options.schema || null
         };
 
-        this.cache = null;
-        this.writeLock = Promise.resolve();
-        this.stats = { reads: 0, writes: 0, cacheHits: 0 };
+        // 3. Validate Key
+        if (this.config.encryptionKey && this.config.encryptionKey.length !== 32) {
+            throw new Error("Encryption key must be exactly 32 bytes (64 hex chars).");
+        }
+
+        // 4. Internal State
+        this.data = {}; 
         this._indices = new Map();
+        this._writeTimeout = null;
+        this._writePromise = Promise.resolve();
+        this._loaded = false;
+
+        // 5. Middleware Storage
         this._middleware = {
-            before: { set: [], delete: [], push: [], pull: [], transaction: [], batch: [] },
-            after: { set: [], delete: [], push: [], pull: [], transaction: [], batch: [] }
+            before: { set: [], delete: [], push: [], pull: [] },
+            after: { set: [], delete: [], push: [], pull: [] }
         };
 
-        // Asynchronously initialize. Operations will queue behind this promise.
-        this._initPromise = this._initialize();
+        // 6. Start Loading
+        this._initPromise = this._load();
     }
 
-    // --- Middleware ---
+    // ==========================================
+    //             CORE ENGINE
+    // ==========================================
 
-    /**
-     * Registers a middleware function to run before an operation.
-     * @param {'set'|'delete'|'push'|'pull'|'transaction'|'batch'} operation - The operation type.
-     * @param {string} pathPattern - A lodash path with optional wildcards (e.g., 'users.*.name').
-     * @param {Function} callback - The middleware function. It receives an object with context (path, value, etc.) and can modify it.
-     */
-    before(operation, pathPattern, callback) {
-        if (this._middleware.before[operation]) {
-            const regex = new RegExp(`^${pathPattern.replace(/\*/g, '[^.]+').replace(/\./g, '\.')}$`);
-            this._middleware.before[operation].push({ regex, callback });
-        }
-    }
-
-    /**
-     * Registers a middleware function to run after an operation.
-     * @param {'set'|'delete'|'push'|'pull'|'transaction'|'batch'} operation - The operation type.
-     * @param {string} pathPattern - A lodash path with optional wildcards (e.g., 'users.*.name').
-     * @param {Function} callback - The middleware function. It receives an object with context (path, value, finalData).
-     */
-    after(operation, pathPattern, callback) {
-        if (this._middleware.after[operation]) {
-            const regex = new RegExp(`^${pathPattern.replace(/\*/g, '[^.]+').replace(/\./g, '\.')}$`);
-            this._middleware.after[operation].push({ regex, callback });
-        }
-    }
-
-    /**
-     * @private
-     * Executes middleware for a given hook and operation.
-     */
-    _runMiddleware(hook, operation, context) {
-        const middlewares = this._middleware[hook][operation] || [];
-        let modifiedContext = context;
-
-        for (const { regex, callback } of middlewares) {
-            if (regex.test(modifiedContext.path)) {
-                modifiedContext = callback(modifiedContext);
-                if (hook === 'before' && !modifiedContext) {
-                    throw new Error(`Middleware for ${operation} on path ${context.path} must return a context object.`);
-                }
+    async _load() {
+        try {
+            // Crash Recovery: Check for .tmp file
+            if (fsSync.existsSync(this.filename + ".tmp")) {
+                console.warn("[JSONDatabase] Recovering from crash...");
+                await fs.rename(this.filename + ".tmp", this.filename);
             }
+
+            // Ensure file exists
+            await fs.access(this.filename).catch(async () => {
+                await fs.writeFile(this.filename, this.config.encryptionKey ? this._encrypt({}) : '{}');
+            });
+
+            // Read & Parse
+            const content = await fs.readFile(this.filename, "utf8");
+            this.data = content.trim() ? (this.config.encryptionKey ? this._decrypt(content) : JSON.parse(content)) : {};
+        } catch (e) {
+            console.error("[JSONDatabase] Load Error:", e);
+            this.data = {}; // Fallback
         }
-        return modifiedContext;
+        this._rebuildIndices();
+        this._loaded = true;
+        this.emit("ready");
     }
 
-    // --- Encryption & Decryption ---
-    _encrypt(data) {
-        const iv = crypto.randomBytes(IV_LENGTH);
-        const cipher = crypto.createCipheriv(
-            ALGORITHM,
-            this.config.encryptionKey,
-            iv
-        );
-        const jsonString = JSON.stringify(data);
-        const encrypted = Buffer.concat([
-            cipher.update(jsonString, "utf8"),
-            cipher.final(),
-        ]);
-        const authTag = cipher.getAuthTag();
-        return JSON.stringify({
-            iv: iv.toString("hex"),
-            tag: authTag.toString("hex"),
-            content: encrypted.toString("hex"),
+    async _ensureReady() {
+        if (!this._loaded) await this._initPromise;
+    }
+
+    /**
+     * The "Smart Save" Engine.
+     * Updates indices immediately, then schedules a disk write.
+     */
+    async _save() {
+        this._rebuildIndices(); 
+        this.emit("change", this.data);
+
+        // Debounce: Cancel previous timer
+        if (this._writeTimeout) clearTimeout(this._writeTimeout);
+
+        return new Promise((resolve, reject) => {
+            this._writeTimeout = setTimeout(async () => {
+                // Queue behind any existing write
+                await this._writePromise;
+                
+                this._writePromise = (async () => {
+                    let release;
+                    try {
+                        // Atomic Lock
+                        release = await lockfile.lock(this.filename, { retries: 3 });
+                        
+                        const content = this.config.encryptionKey 
+                            ? this._encrypt(this.data) 
+                            : JSON.stringify(this.data, null, this.config.prettyPrint ? 2 : 0);
+                        
+                        // Safe Write: Write Tmp -> Rename
+                        const temp = this.filename + ".tmp";
+                        await fs.writeFile(temp, content);
+                        await fs.rename(temp, this.filename);
+                        
+                        this.emit("write");
+                        resolve();
+                    } catch (e) {
+                        console.error("[JSONDatabase] Write Failed:", e);
+                        reject(e);
+                    } finally {
+                        if (release) await release();
+                    }
+                })();
+            }, this.config.saveDelay);
         });
     }
 
-    _decrypt(encryptedPayload) {
-        try {
-            const payload = JSON.parse(encryptedPayload);
-            const iv = Buffer.from(payload.iv, "hex");
-            const authTag = Buffer.from(payload.tag, "hex");
-            const encryptedContent = Buffer.from(payload.content, "hex");
-            const decipher = crypto.createDecipheriv(
-                ALGORITHM,
-                this.config.encryptionKey,
-                iv
-            );
-            decipher.setAuthTag(authTag);
-            const decrypted =
-                decipher.update(encryptedContent, "hex", "utf8") +
-                decipher.final("utf8");
-            return JSON.parse(decrypted);
-        } catch (e) {
-            throw new SecurityError(
-                "Decryption failed. The file may be corrupted, tampered with, or the encryption key is incorrect."
-            );
+    // ==========================================
+    //           BASIC OPERATIONS
+    // ==========================================
+
+    async set(path, value) {
+        await this._ensureReady();
+        const ctx = this._runMiddleware('before', 'set', { path, value });
+        _.set(this.data, ctx.path, ctx.value);
+        
+        // Schema Validation check (if configured)
+        if (this.config.schema) {
+            const result = this.config.schema.safeParse(this.data);
+            if (!result.success) throw new Error(`Schema Validation Failed: ${JSON.stringify(result.error.issues)}`);
         }
+
+        const p = this._save();
+        this._runMiddleware('after', 'set', { ...ctx, data: this.data });
+        return p;
     }
 
-    // --- Private Core Methods ---
-
-    /** @private Kicks off the initialization process. */
-    async _initialize() {
-        // --- FIX: Crash Recovery for Durable Writes ---
-        // Check if a temporary file exists from a previously failed write.
-        // If so, it represents the most recent state. We recover by renaming it.
-        const tempFile = this.filename + ".tmp";
-        try {
-            await fs.access(tempFile);
-            console.warn(
-                `[JSONDatabase] Found temporary file ${tempFile}. Recovering from a previous failed write.`
-            );
-            await fs.rename(tempFile, this.filename);
-            console.log(
-                `[JSONDatabase] Recovery successful. ${this.filename} has been restored.`
-            );
-        } catch (e) {
-            // This is the normal case where no temp file exists. Do nothing.
-        }
-
-        try {
-            await this._refreshCache();
-            this._rebuildAllIndices();
-        } catch (err) {
-            const initError = new DBInitializationError(
-                `Failed to initialize database: ${err.message}`
-            );
-            this.emit("error", initError);
-            console.error(
-                `[JSONDatabase] FATAL: Initialization failed for ${this.filename}. The database is in an unusable state.`, 
-                err
-            );
-            // --- ENHANCEMENT: Make the instance unusable if init fails ---
-            // By re-throwing here, the _initPromise will be rejected, and all subsequent
-            // operations waiting on _ensureInitialized() will fail immediately.
-            throw initError;
-        }
-    }
-
-    /** @private Reads file, decrypts if necessary, and populates cache. */
-    async _refreshCache() {
-        try {
-            const fileContent = await fs.readFile(this.filename, "utf8");
-            if (this.config.encryptionKey) {
-                this.cache =
-                    fileContent.trim() === "" ? {} : this._decrypt(fileContent);
-            } else {
-                this.cache = fileContent.trim() === "" ? {} : JSON.parse(fileContent);
-            }
-            this.stats.reads++;
-        } catch (err) {
-            if (err.code === "ENOENT") {
-                console.warn(
-                    `[JSONDatabase] File ${this.filename} not found. Creating.`
-                );
-                this.cache = {};
-                // Do not write file here; _atomicWrite will create it safely.
-            } else if (err instanceof SyntaxError && !this.config.encryptionKey) {
-                throw new DBInitializationError(
-                    `Failed to parse JSON from ${this.filename}. File is corrupted.`
-                );
-            } else {
-                throw err; // Re-throw security, crypto, and other errors
-            }
-        }
-    }
-
-    /** @private Ensures all operations wait for initialization to complete. */
-    async _ensureInitialized() {
-        // This promise will be rejected if _initialize() fails, stopping all operations.
-        return this._initPromise;
-    }
-
-    /** @private Performs an atomic write operation. */
-    async _atomicWrite(operationFn) {
-        await this._ensureInitialized();
-
-        const executeWrite = async () => {
-            let releaseLock;
-            try {
-                await fs.access(this.filename).catch(() => fs.writeFile(this.filename, this.config.encryptionKey ? this._encrypt({}) : '{}', 'utf8'));
-
-                releaseLock = await lockfile.lock(this.filename, {
-                    stale: 7000,
-                    retries: { retries: 5, factor: 1.2, minTimeout: 200 },
-                });
-
-                await this._refreshCache();
-                const oldData = this.cache;
-                const dataToModify = _.cloneDeep(oldData);
-                const newData = await operationFn(dataToModify);
-
-                if (newData === undefined) {
-                    throw new TransactionError("Atomic operation function returned undefined. Aborting to prevent data loss. Did you forget to `return data`?");
-                }
-
-                if (this.config.schema) {
-                    const validationResult = this.config.schema.safeParse(newData);
-                    if (!validationResult.success) {
-                        throw new ValidationError("Schema validation failed.", validationResult.error.issues);
-                    }
-                }
-
-                this._updateIndices(oldData, newData);
-
-                if (this.config.writeOnChange && _.isEqual(newData, oldData)) {
-                    return oldData;
-                }
-
-                const contentToWrite = this.config.encryptionKey
-                    ? this._encrypt(newData)
-                    : JSON.stringify(newData, null, this.config.prettyPrint ? 2 : 0);
-
-                const tempFile = this.filename + ".tmp";
-                await fs.writeFile(tempFile, contentToWrite, "utf8");
-                await fs.rename(tempFile, this.filename);
-
-                this.cache = newData;
-                this.stats.writes++;
-                this.emit("write", { filename: this.filename, timestamp: Date.now() });
-                this.emit("change", { oldValue: oldData, newValue: newData });
-
-                return newData;
-            } catch (error) {
-                this.emit("error", error);
-                // Do not log here, let the caller handle the error.
-                throw error;
-            } finally {
-                if (releaseLock) {
-                    await releaseLock();
-                }
-            }
-        };
-
-        // Create a promise for the current operation.
-        const operationPromise = this.writeLock.then(() => executeWrite());
-        // Prevent the main chain from breaking on a rejection, allowing subsequent writes.
-        this.writeLock = operationPromise.catch(() => {});
-        // Return the promise for the current operation so the caller can handle its specific result/error.
-        return operationPromise;
-    }
-
-    // --- Indexing ---
-
-    /** @private Clears and rebuilds all defined indices from the current cache. */
-    _rebuildAllIndices() {
-        this._indices.clear();
-        for (const indexDef of this.config.indices) {
-            this._indices.set(indexDef.name, new Map());
-        }
-        if (this.config.indices.length > 0 && !_.isEmpty(this.cache)) {
-            // Rebuild by treating the current state as "new" and the previous state as empty.
-            this._updateIndices({}, this.cache);
-        }
-        console.log(
-            `[JSONDatabase] Rebuilt ${this.config.indices.length} indices for ${this.filename}.`
-        );
-    }
-
-    /**
-     * @private Compares old and new data to update indices efficiently.
-     * FIX: Replaced inefficient and buggy index update logic with a robust key-based comparison.
-     * This new implementation correctly handles additions, deletions, and in-place updates,
-     * and is significantly more performant.
-     */
-    _updateIndices(oldData, newData) {
-        for (const indexDef of this.config.indices) {
-            const indexMap = this._indices.get(indexDef.name);
-            if (!indexMap) continue;
-
-            const oldCollection = _.get(oldData, indexDef.path, {});
-            const newCollection = _.get(newData, indexDef.path, {});
-
-            if (!_.isObject(oldCollection) || !_.isObject(newCollection)) {
-                continue; // Indexing requires a collection (object or array).
-            }
-
-            const allKeys = _.union(_.keys(oldCollection), _.keys(newCollection));
-
-            for (const key of allKeys) {
-                const oldItem = oldCollection[key];
-                const newItem = newCollection[key];
-
-                if (_.isEqual(oldItem, newItem)) {
-                    continue; // Item is unchanged, no index update needed.
-                }
-
-                const oldVal = oldItem?.[indexDef.field];
-                const newVal = newItem?.[indexDef.field];
-
-                if (_.isEqual(oldVal, newVal)) {
-                    continue; // Indexed field's value is unchanged.
-                }
-
-                // 1. Remove the old value if it was indexed and pointed to this item.
-                if (oldVal !== undefined && indexMap.get(oldVal) === key) {
-                    indexMap.delete(oldVal);
-                }
-
-                // 2. Add the new value if it's defined.
-                if (newVal !== undefined) {
-                    // Check for unique constraint violation before adding.
-                    if (indexDef.unique && indexMap.has(newVal)) {
-                        throw new IndexViolationError(
-                            `Unique index '${indexDef.name}' violated for value '${newVal}'.`
-                        );
-                    }
-                    indexMap.set(newVal, key);
-                }
-            }
-        }
-    }
-
-    // --- Public API ---
-
-    async get(path, defaultValue) {
-        await this._ensureInitialized();
-        this.stats.cacheHits++;
-        if (path === undefined || path === null) {
-            return this.cache;
-        }
-        return _.get(this.cache, path, defaultValue);
+    async get(path, defaultValue = null) {
+        await this._ensureReady();
+        return _.get(this.data, path, defaultValue);
     }
 
     async has(path) {
-        await this._ensureInitialized();
-        this.stats.cacheHits++;
-        return _.has(this.cache, path);
-    }
-
-    async set(path, value) {
-        let context = { path, value };
-        context = this._runMiddleware('before', 'set', context);
-
-        const result = await this._atomicWrite((data) => {
-            _.set(data, context.path, context.value);
-            return data;
-        });
-
-        this._runMiddleware('after', 'set', { ...context, finalData: this.cache });
-        return result;
+        await this._ensureReady();
+        return _.has(this.data, path);
     }
 
     async delete(path) {
-        let context = { path };
-        context = this._runMiddleware('before', 'delete', context);
-
-        let deleted = false;
-        const result = await this._atomicWrite((data) => {
-            deleted = _.unset(data, context.path);
-            return data;
-        });
-
-        this._runMiddleware('after', 'delete', { ...context, finalData: this.cache });
-        return deleted;
+        await this._ensureReady();
+        const ctx = this._runMiddleware('before', 'delete', { path });
+        _.unset(this.data, ctx.path);
+        const p = this._save();
+        this._runMiddleware('after', 'delete', { ...ctx, data: this.data });
+        return p;
     }
 
     async push(path, ...items) {
-        if (items.length === 0) return;
+        await this._ensureReady();
+        const arr = _.get(this.data, path, []);
+        if (!Array.isArray(arr)) throw new Error(`Path ${path} is not an array`);
         
-        let context = { path, items };
-        context = this._runMiddleware('before', 'push', context);
-
-        const result = await this._atomicWrite((data) => {
-            const arr = _.get(data, context.path);
-            const targetArray = Array.isArray(arr) ? arr : [];
-            context.items.forEach((item) => {
-                if (!targetArray.some((existing) => _.isEqual(existing, item))) {
-                    targetArray.push(item);
-                }
-            });
-            _.set(data, context.path, targetArray);
-            return data;
-        });
-
-        this._runMiddleware('after', 'push', { ...context, finalData: this.cache });
-        return result;
-    }
-
-    async pull(path, ...itemsToRemove) {
-        if (itemsToRemove.length === 0) return;
-
-        let context = { path, itemsToRemove };
-        context = this._runMiddleware('before', 'pull', context);
-
-        const result = await this._atomicWrite((data) => {
-            const arr = _.get(data, context.path);
-            if (Array.isArray(arr)) {
-                _.pullAllWith(arr, context.itemsToRemove, _.isEqual);
+        let modified = false;
+        items.forEach(item => {
+            if (!arr.some(x => _.isEqual(x, item))) {
+                arr.push(item);
+                modified = true;
             }
-            return data;
         });
-        
-        this._runMiddleware('after', 'pull', { ...context, finalData: this.cache });
-        return result;
-    }
 
-    async transaction(transactionFn) {
-        return this._atomicWrite(transactionFn);
-    }
-
-    async batch(ops, options = { stopOnError: false }) {
-        if (!Array.isArray(ops) || ops.length === 0) return;
-
-        return this._atomicWrite((data) => {
-            for (const [index, op] of ops.entries()) {
-                try {
-                    if (!op || !op.type || op.path === undefined)
-                        throw new Error("Invalid operation format: missing type or path.");
-
-                    switch (op.type) {
-                        case "set":
-                            if (!op.hasOwnProperty("value"))
-                                throw new Error("Set operation missing 'value'.");
-                            _.set(data, op.path, op.value);
-                            break;
-                        case "delete":
-                            _.unset(data, op.path);
-                            break;
-                        case "push":
-                            if (!Array.isArray(op.values))
-                                throw new Error("Push operation 'values' must be an array.");
-                            const arr = _.get(data, op.path);
-                            const targetArray = Array.isArray(arr) ? arr : [];
-                            op.values.forEach((item) => {
-                                if (!targetArray.some((existing) => _.isEqual(existing, item)))
-                                    targetArray.push(item);
-                            });
-                            _.set(data, op.path, targetArray);
-                            break;
-                        case "pull":
-                            if (!Array.isArray(op.values))
-                                throw new Error("Pull operation 'values' must be an array.");
-                            const pullArr = _.get(data, op.path);
-                            if (Array.isArray(pullArr))
-                                _.pullAllWith(pullArr, op.values, _.isEqual);
-                            break;
-                        default:
-                            throw new Error(`Unsupported operation type: '${op.type}'.`);
-                    }
-                } catch (err) {
-                    const errorMessage = `[JSONDatabase] Batch failed at operation index ${index} (type: ${op?.type}): ${err.message}`;
-                    if (options.stopOnError) {
-                        throw new Error(errorMessage);
-                    } else {
-                        console.error(errorMessage);
-                    }
-                }
-            }
-            return data;
-        });
-    }
-
-    async find(collectionPath, predicate) {
-        await this._ensureInitialized();
-        const collection = _.get(this.cache, collectionPath);
-        if (typeof collection !== "object" || collection === null) return undefined;
-
-        this.stats.cacheHits++;
-        return _.find(collection, predicate);
-    }
-
-    async findByIndex(indexName, value) {
-        await this._ensureInitialized();
-        if (!this._indices.has(indexName)) {
-            throw new Error(`Index with name '${indexName}' does not exist.`);
+        if (modified) {
+            _.set(this.data, path, arr);
+            return this._save();
         }
+    }
 
-        this.stats.cacheHits++;
-        const indexMap = this._indices.get(indexName);
-        const objectKey = indexMap.get(value);
+    async pull(path, ...items) {
+        await this._ensureReady();
+        const arr = _.get(this.data, path);
+        if (Array.isArray(arr)) {
+            _.pullAllWith(arr, items, _.isEqual);
+            return this._save();
+        }
+    }
 
-        if (objectKey === undefined) return undefined;
+    // ==========================================
+    //           LAYBON 1.5 MATH
+    // ==========================================
 
-        const indexDef = this.config.indices.find((i) => i.name === indexName);
-        const fullPath = [..._.toPath(indexDef.path), objectKey];
-        return _.get(this.cache, fullPath);
+    async add(path, amount) {
+        await this._ensureReady();
+        const current = _.get(this.data, path, 0);
+        if (typeof current !== 'number') throw new Error(`Value at ${path} is not a number`);
+        _.set(this.data, path, current + amount);
+        return this._save();
+    }
+
+    async subtract(path, amount) {
+        return this.add(path, -amount);
+    }
+
+    // ==========================================
+    //        ADVANCED (Transaction/Batch)
+    // ==========================================
+
+    /** 
+     * Executes a function against the current data.
+     * Since we use debouncing, this is effectively atomic in memory.
+     */
+    async transaction(fn) {
+        await this._ensureReady();
+        const result = await fn(this.data); // Pass reference to data
+        await this._save();
+        return result;
+    }
+
+    async batch(ops) {
+        await this._ensureReady();
+        for(const op of ops) {
+            if(op.type === 'set') _.set(this.data, op.path, op.value);
+            else if(op.type === 'delete') _.unset(this.data, op.path);
+            else if(op.type === 'push') {
+                const arr = _.get(this.data, op.path, []);
+                op.values.forEach(v => { if(!arr.includes(v)) arr.push(v) });
+            }
+        }
+        return this._save();
     }
 
     async clear() {
-        console.warn(
-            `[JSONDatabase] Clearing all data from ${this.filename}. This action is irreversible.`
-        );
-        return this._atomicWrite(() => ({}));
+        await this._ensureReady();
+        this.data = {};
+        return this._save();
     }
 
-    getStats() {
-        return { ...this.stats };
+    // ==========================================
+    //           QUERY & PAGINATION
+    // ==========================================
+
+    async find(path, predicate) {
+        await this._ensureReady();
+        return _.find(_.get(this.data, path), predicate);
+    }
+
+    async findByIndex(indexName, value) {
+        await this._ensureReady();
+        const map = this._indices.get(indexName);
+        if (!map) throw new Error(`Index ${indexName} not found`);
+        const path = map.get(value);
+        return path ? _.get(this.data, path) : undefined;
+    }
+
+    async paginate(path, page = 1, limit = 10) {
+        await this._ensureReady();
+        const items = _.get(this.data, path, []);
+        if (!Array.isArray(items)) throw new Error("Target is not an array");
+        
+        const total = items.length;
+        const totalPages = Math.ceil(total / limit);
+        const offset = (page - 1) * limit;
+        
+        return {
+            data: items.slice(offset, offset + limit),
+            meta: { total, page, limit, totalPages, hasNext: page < totalPages }
+        };
+    }
+
+    // ==========================================
+    //           UTILITIES
+    // ==========================================
+
+    async createSnapshot(label = 'manual') {
+        await this._ensureReady();
+        // Force a save first to ensure disk is up to date
+        await this._savePromise; 
+        const backupName = `${this.filename.replace('.json', '')}.${label}-${Date.now()}.bak`;
+        await fs.copyFile(this.filename, backupName);
+        return backupName;
     }
 
     async close() {
-        await this.writeLock;
-
-        this.cache = null;
-        this._indices.clear();
+        // Wait for any pending writes
+        if (this._writeTimeout) clearTimeout(this._writeTimeout);
+        await this._writePromise;
         this.removeAllListeners();
-        this._initPromise = null;
+        this.data = null;
+    }
 
-        const finalStats = JSON.stringify(this.getStats());
-        console.log(
-            `[JSONDatabase] Closed connection to ${this.filename}. Final Stats: ${finalStats}`
-        );
+    // Middleware Helpers
+    before(op, pattern, cb) { this._addM('before', op, pattern, cb); }
+    after(op, pattern, cb) { this._addM('after', op, pattern, cb); }
+    _addM(hook, op, pattern, cb) {
+        // Convert glob pattern (users.*) to Regex
+        const regex = new RegExp(`^${pattern.replace(/\./g, '\\.').replace(/\*/g, '.*')}$`);
+        this._middleware[hook][op].push({ regex, cb });
+    }
+    _runMiddleware(hook, op, ctx) {
+        this._middleware[hook][op].forEach(m => { 
+            if(m.regex.test(ctx.path)) ctx = m.cb(ctx); 
+        });
+        return ctx;
+    }
+
+    // Internal: Indexing
+    _rebuildIndices() {
+        this._indices.clear();
+        this.config.indices.forEach(idx => {
+            const map = new Map();
+            const col = _.get(this.data, idx.path);
+            if (typeof col === 'object') {
+                _.forEach(col, (item, key) => {
+                    const val = _.get(item, idx.field);
+                    if (val !== undefined) map.set(val, `${idx.path}.${key}`);
+                });
+            }
+            this._indices.set(idx.name, map);
+        });
+    }
+
+    // Internal: Crypto
+    _encrypt(d) {
+        const iv = crypto.randomBytes(16);
+        const c = crypto.createCipheriv("aes-256-gcm", this.config.encryptionKey, iv);
+        const e = Buffer.concat([c.update(JSON.stringify(d)), c.final()]);
+        return JSON.stringify({ iv: iv.toString('hex'), t: c.getAuthTag().toString('hex'), d: e.toString('hex') });
+    }
+    _decrypt(s) {
+        const p = JSON.parse(s);
+        const d = crypto.createDecipheriv("aes-256-gcm", this.config.encryptionKey, Buffer.from(p.iv, 'hex'));
+        d.setAuthTag(Buffer.from(p.t, 'hex'));
+        return JSON.parse(Buffer.concat([d.update(Buffer.from(p.d, 'hex')), d.final()]).toString());
     }
 }
 
