@@ -38,3 +38,13 @@ Thumbs.db
 
 # Temporary test databases
 __tests__/test-data/
+
+# Ignore any files or directories containing "test" in their name
+*test*
+**/*test*/
+**/*test*/*
+*_test*
+*_test*/ 
+**/*_test*
+**/*_test*/
+
