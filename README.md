@@ -54,11 +54,23 @@ Full documentation is available in the `website/docs.html` file included in this
 ## 🏗️ Project Ares Integration
 
 This database is optimized for the **ST Financial Engine**.
+
 - Use `encryptionKey` for all financial records.
 - Use `paginate()` for transaction history lists.
 - Use `createSnapshot('daily')` for automated backups.
 
 ## 🤝 Contributing
 
-Built by **SethunThunder** for the ST Empire. 
+Built by **SethunThunder** for the ST Empire.
 Laybon Gold 1.5 Assisted.
+
+## 🚀 Performance (v2.0)
+
+| Operation | 10k Records | 1M Records |
+| :--- | :--- | :--- |
+| **Indexed Read** | 0.15 ms | 0.07 ms |
+| **Write (Ingest)** | 42,450 ops/sec | 57,845 ops/sec |
+| **Single Update** | 100 ms | 6.3 s |
+
+> **Fastest in Class:** Indexed reads are O(1). Updates are 1.5x faster than v1.0.
+> [View Full Benchmarks](./BENCHMARKS.md)

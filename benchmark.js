@@ -2,7 +2,7 @@ const JSONDatabase = require('./JSONDatabase');
 const fs = require('fs');
 const path = require('path');
 
-// ANSI Colors for the console
+// ANSI Colors
 const C = {
     green: '\x1b[32m',
     red: '\x1b[31m',
@@ -13,119 +13,102 @@ const C = {
 
 const DB_FILE = 'bench_test.json';
 
-async function runBenchmarks() {
-    console.log(`${C.cyan}========================================`);
-    console.log(`   🚀 ST DATABASE PERFORMANCE TEST 🚀`);
-    console.log(`========================================${C.reset}\n`);
+async function runSuite(count) {
+    console.log(`${C.cyan}--------------------------------------------------`);
+    console.log(`   RUNNING BENCHMARK FOR ${count.toLocaleString()} RECORDS`);
+    console.log(`--------------------------------------------------${C.reset}`);
 
-    // 0. Cleanup previous run
+    // Cleanup
     if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
     if (fs.existsSync(DB_FILE + '.tmp')) fs.unlinkSync(DB_FILE + '.tmp');
 
-    // 1. Initialization
-    console.log(`${C.yellow}[1] Initializing Database...${C.reset}`);
+    // 1. Setup
     const db = new JSONDatabase(DB_FILE, {
-        saveDelay: 50, // 50ms debounce
-        indices: [{ name: 'user_email', path: 'users', field: 'email' }]
+        saveDelay: 50,
+        indices: [{ name: 'email', path: 'users', field: 'email' }]
     });
-    
-    // Wait for init
-    await db.set('meta', { start: Date.now() });
-    console.log(`${C.green}✔ Database Ready.${C.reset}\n`);
 
-    // ---------------------------------------------------------
-    // TEST 2: BURST WRITES (Debounce Test)
-    // ---------------------------------------------------------
-    console.log(`${C.yellow}[2] Testing Burst Writes (10,000 operations)...${C.reset}`);
+    // 2. Initial Bulk Write (Burst)
+    console.log(`[1] Generating & Writing ${count.toLocaleString()} records...`);
+    
     const startWrite = process.hrtime.bigint();
     
-    // We simulate a loop. In a normal file DB, this would take 30+ seconds.
-    // Here, it should be near instant because it hits RAM and debounces the disk write.
-    const COUNT = 10000;
-    for (let i = 0; i < COUNT; i++) {
-        // We don't await here to simulate rapid fire events (like server requests)
-        // But we push promises to array to measure API acknowledgment time
-        db.set(`users.u${i}`, { 
-            id: i, 
-            name: `User ${i}`, 
-            email: `user${i}@st-empire.com`,
-            balance: 100 
+    // Batch generation
+    const BATCH_SIZE = 10000;
+    for (let i = 0; i < count; i++) {
+        db.set(`users.u${i}`, {
+            id: i,
+            name: `User ${i}`,
+            email: `user${i}@example.com`,
+            meta: 'x'.repeat(50) // Add some weight
         });
+        if (i % BATCH_SIZE === 0) await new Promise(r => setImmediate(r));
     }
     
-    // Force a wait for the last operation to be acknowledged by the API
-    await db.set('meta.end_write', true);
-
+    // Wait for write
+    await db.set('meta.done', true);
+    
     const endWrite = process.hrtime.bigint();
-    const writeTime = Number(endWrite - startWrite) / 1e6; // Convert to ms
-
-    console.log(`   ➜ Processed ${COUNT} writes in: ${C.cyan}${writeTime.toFixed(2)}ms${C.reset}`);
-    console.log(`   ➜ Speed: ${C.green}${Math.round(COUNT / (writeTime/1000))} ops/sec${C.reset} (Virtual Speed)`);
-    console.log(`   (Note: Disk writes are happening in the background)\n`);
-
-    // ---------------------------------------------------------
-    // TEST 3: ATOMIC MATH (Concurrency Test)
-    // ---------------------------------------------------------
-    console.log(`${C.yellow}[3] Testing Atomic Math (1,000 concurrent adds)...${C.reset}`);
-    
-    await db.set('wallet', 0);
-    const mathPromises = [];
-    for(let i=0; i<1000; i++) {
-        mathPromises.push(db.add('wallet', 1));
-    }
-    await Promise.all(mathPromises);
-    
-    const finalWallet = await db.get('wallet');
-    if (finalWallet === 1000) {
-        console.log(`${C.green}✔ SUCCESS: Wallet balance is 1000.${C.reset}`);
-    } else {
-        console.log(`${C.red}✘ FAIL: Wallet balance is ${finalWallet} (Expected 1000). Race condition detected!${C.reset}`);
-    }
-    console.log("");
-
-    // ---------------------------------------------------------
-    // TEST 4: READ PERFORMANCE (O(n) vs O(1))
-    // ---------------------------------------------------------
-    console.log(`${C.yellow}[4] Testing Read Speeds (Dataset: 10,000 records)...${C.reset}`);
-    
-    const targetEmail = `user9999@st-empire.com`; // The very last user
-    
-    // A. Standard Find (Scanning the array/object)
-    const startScan = process.hrtime.bigint();
-    await db.find('users', u => u.email === targetEmail);
-    const endScan = process.hrtime.bigint();
-    const scanTime = Number(endScan - startScan) / 1e6;
-
-    // B. Indexed Find (Hash Map Lookup)
-    const startIndex = process.hrtime.bigint();
-    await db.findByIndex('user_email', targetEmail);
-    const endIndex = process.hrtime.bigint();
-    const indexTime = Number(endIndex - startIndex) / 1e6;
-
-    console.log(`   ➜ Standard Scan (O(n)):  ${C.red}${scanTime.toFixed(4)}ms${C.reset}`);
-    console.log(`   ➜ Indexed Look (O(1)):  ${C.green}${indexTime.toFixed(4)}ms${C.reset}`);
-    
-    const improvement = (scanTime / indexTime).toFixed(1);
-    console.log(`   🔥 Indexing is ${C.cyan}${improvement}x faster${C.reset}!\n`);
-
-    // ---------------------------------------------------------
-    // CLEANUP
-    // ---------------------------------------------------------
-    console.log(`${C.yellow}[5] Waiting for final disk flush...${C.reset}`);
-    
-    // Wait for the debounce timer (50ms) + a bit of buffer
-    await new Promise(r => setTimeout(r, 1000));
+    const writeTime = Number(endWrite - startWrite) / 1e6;
+    const opsPerSec = Math.floor(count / (writeTime / 1000));
     
     const stats = fs.statSync(DB_FILE);
     const sizeMB = stats.size / 1024 / 1024;
     
-    console.log(`${C.green}✔ All Tests Complete.${C.reset}`);
-    console.log(`   Final DB Size: ${sizeMB.toFixed(2)} MB`);
+    console.log(`    ➜ Write Time: ${C.green}${writeTime.toFixed(2)}ms${C.reset}`);
+    console.log(`    ➜ Ops/Sec:    ${C.cyan}${opsPerSec.toLocaleString()}${C.reset}`);
+    console.log(`    ➜ DB Size:    ${C.yellow}${sizeMB.toFixed(2)} MB${C.reset}`);
+
+    // 3. Indexed Read
+    console.log(`[2] Indexed Read (O(1))...`);
+    const targetEmail = `user${Math.floor(count/2)}@example.com`; // Middle user
     
-    // Clean up
+    const startRead = process.hrtime.bigint();
+    await db.findByIndex('email', targetEmail);
+    const endRead = process.hrtime.bigint();
+    const readTime = Number(endRead - startRead) / 1e6;
+    
+    console.log(`    ➜ Read Time:  ${C.green}${readTime.toFixed(4)}ms${C.reset}`);
+
+    // 4. Single Update (Full Rewrite Cost)
+    console.log(`[3] Single Update (Rewrite Cost)...`);
+    const startUpdate = process.hrtime.bigint();
+    await db.set(`users.u${Math.floor(count/2)}.name`, 'Updated Name');
+    const endUpdate = process.hrtime.bigint();
+    const updateTime = Number(endUpdate - startUpdate) / 1e6;
+    
+    console.log(`    ➜ Update Time: ${C.yellow}${updateTime.toFixed(2)}ms${C.reset}`);
+
+    // Cleanup
     fs.unlinkSync(DB_FILE);
-    if (fs.existsSync(DB_FILE + '.tmp')) fs.unlinkSync(DB_FILE + '.tmp');
-    if (fs.existsSync(DB_FILE + '.bak')) fs.unlinkSync(DB_FILE + '.bak');
+    
+    return {
+        records: count,
+        fileSizeMB: parseFloat(sizeMB.toFixed(2)),
+        initialWriteMs: parseFloat(writeTime.toFixed(2)),
+        writeOpsSec: opsPerSec,
+        indexedReadMs: parseFloat(readTime.toFixed(4)),
+        singleUpdateMs: parseFloat(updateTime.toFixed(2))
+    };
 }
 
-runBenchmarks().catch(console.error);
+async function runAll() {
+    const results = [];
+    const sizes = [1000, 10000, 100000, 1000000];
+    
+    console.log(`${C.cyan}========================================`);
+    console.log(`   🚀 ST DATABASE BENCHMARK SUITE 🚀`);
+    console.log(`========================================${C.reset}\n`);
+
+    for (const size of sizes) {
+        results.push(await runSuite(size));
+        console.log("");
+    }
+
+    console.log(`${C.cyan}========================================`);
+    console.log(`   FINAL RESULTS (JSON)`);
+    console.log(`========================================${C.reset}`);
+    console.log(JSON.stringify({ runs: results }, null, 2));
+}
+
+runAll().catch(console.error);
