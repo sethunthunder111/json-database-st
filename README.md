@@ -4,8 +4,6 @@
 [![NPM Downloads](https://img.shields.io/npm/dm/json-database-st.svg)](https://www.npmjs.com/package/json-database-st)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-The high-performance, secure, JSON-based database engine powering **Project Ares** and the **ST Conglomerate**.
-
 Designed for Node.js applications that need data persistence without the complexity of SQL servers.
 
 ## 🚀 Key Features
@@ -50,10 +48,6 @@ run();
 ## 📖 Documentation
 
 Full documentation is available in the `website/docs.html` file included in this repository.
-
-## 🏗️ Project Ares Integration
-
-This database is optimized for the **ST Financial Engine**.
 
 - Use `encryptionKey` for all financial records.
 - Use `paginate()` for transaction history lists.
