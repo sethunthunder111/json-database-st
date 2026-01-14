@@ -12,7 +12,7 @@ export interface DatabaseOptions {
   encryptionKey?: string;
   saveDelay?: number;
   prettyPrint?: boolean;
-  schema?: any; // Zod schema or similar
+  schema?: any;
   indices?: { name: string; path: string; field: string; unique?: boolean }[];
   silent?: boolean;
   wal?: boolean;
@@ -22,7 +22,7 @@ export interface MiddlewareContext {
   path: string;
   value?: any;
   finalData?: any;
-  data?: any;
+  [key: string]: any;
 }
 
 export type MiddlewareFn = (ctx: MiddlewareContext) => MiddlewareContext;
@@ -41,8 +41,8 @@ class DBError extends Error {
 }
 class TransactionError extends DBError {}
 class ValidationError extends DBError {
-  issues: any[];
-  constructor(msg: string, issues: any[]) {
+  issues?: any[];
+  constructor(msg: string, issues?: any[]) {
     super(msg);
     this.issues = issues;
   }
@@ -89,7 +89,7 @@ class QueryCursor implements PromiseLike<any[]> {
 
     public async exec(): Promise<any[]> {
         if (this.dbInstance) {
-            // @ts-ignore - _flushOps is private but we need access
+            // @ts-ignore
             this.dbInstance['_flushOps']();
         }
 
@@ -102,7 +102,7 @@ class QueryCursor implements PromiseLike<any[]> {
                  if (typeof this.options.sort === 'function') {
                      result.sort(this.options.sort);
                  } else {
-                     result = _.orderBy(result, Object.keys(this.options.sort), Object.values(this.options.sort).map(v => v === 1 ? 'asc' : 'desc'));
+                     result = _.orderBy(result, Object.keys(this.options.sort), Object.values(this.options.sort).map((v: any) => v === 1 ? 'asc' : 'desc'));
                  }
             }
             if (this.options.skip) result = result.slice(this.options.skip);
@@ -124,9 +124,6 @@ class QueryCursor implements PromiseLike<any[]> {
     }
 }
 
-/**
- * JSONDatabase
- */
 class JSONDatabase extends EventEmitter {
   public static DBError = DBError;
   public static TransactionError = TransactionError;
@@ -145,8 +142,8 @@ class JSONDatabase extends EventEmitter {
     wal: boolean;
   };
   private _saveTimer: any = null;
-  private _savePromise: Promise<void> | null = null;
-  private _saveResolve: ((value: void | PromiseLike<void>) => void) | null = null;
+  private _savePromise: Promise<boolean> | null = null;
+  private _saveResolve: ((value: boolean | PromiseLike<boolean>) => void) | null = null;
   private _saveReject: ((reason?: any) => void) | null = null;
   
   private _middleware: MiddlewareStore = {
@@ -155,50 +152,42 @@ class JSONDatabase extends EventEmitter {
   };
   private _loaded: boolean = false;
   private _initPromise: Promise<void>;
-  
-  // Auto-Batching Queue
   private _writeQueue: any[] = [];
   private _BATCH_SIZE: number = 1000;
 
   constructor(filename: string, options: DatabaseOptions = {}) {
     super();
 
-    // 1. Path Resolution & Security
     const resolvedPath = path.resolve(filename);
     if (!resolvedPath.startsWith(process.cwd())) {
       throw new Error("Security Violation: Database path must be inside the project directory.");
     }
     this.filename = resolvedPath.endsWith(".json") ? resolvedPath : `${resolvedPath}.json`;
 
-    // 2. Config
     this.config = {
       saveDelay: options.saveDelay || 60,
       schema: options.schema || null,
       indices: options.indices || [],
       encryptionKey: options.encryptionKey || null,
-      prettyPrint: options.prettyPrint !== false, // Default to true
+      prettyPrint: options.prettyPrint !== false,
       silent: options.silent || false,
-      wal: options.wal !== false, // Default to true
+      wal: options.wal !== false,
     };
 
-    // 3. Initialize Rust Core
     this.core = new DatabaseCore(
       this.filename,
       this.config.encryptionKey || undefined,
-      this.config.prettyPrint, // Pass prettyPrint
-      this.config.wal // Pass use_wal
+      this.config.prettyPrint,
+      this.config.wal
     );
 
-    // 4. Initialization Promise
     this._initPromise = this._initialize();
   }
 
   private _log(level: 'info' | 'error' | 'warn', message: string, data?: any) {
     if (this.config.silent) return;
-
     const prefix = `[JSONDB]`;
     const formattedMsg = `${prefix} [${level.toUpperCase()}] ${message}`;
-
     if (level === 'error') {
         if (data) console.error(formattedMsg, data);
         else console.error(formattedMsg);
@@ -213,12 +202,11 @@ class JSONDatabase extends EventEmitter {
 
   private async _initialize() {
       try {
-          // Ensure file exists
-          if (!fs.existsSync(this.filename)) {
-             await fs.promises.writeFile(this.filename, "");
+          if (fs.existsSync(this.filename)) {
+              this.core.load();
+          } else {
+              this.core.set("", {});
           }
-
-          this.core.load();
           this._loaded = true;
           this.emit('ready');
       } catch (e) {
@@ -227,7 +215,6 @@ class JSONDatabase extends EventEmitter {
       }
   }
 
-  // Compatibility method
   public async _ensureInitialized() {
       if (!this._loaded) await this._initPromise;
   }
@@ -235,28 +222,29 @@ class JSONDatabase extends EventEmitter {
   private _flushOps() {
       if (this._writeQueue.length === 0) return;
       const ops = this._writeQueue;
-      this._writeQueue = []; // Clear ref immediately
+      this._writeQueue = []; 
       
       try {
-          // Use JSON serialization for faster N-API transfer
-          // @ts-ignore - batch_from_json is new
-          this.core.batch_from_json(JSON.stringify(ops)); 
+          this.core.batch(ops);
+          for (const op of ops) {
+              if (this._middleware.after[op.type]) {
+                  const { type, ...rest } = op;
+                  this._runMiddleware("after", type, { ...rest, finalData: this.core.get(undefined) });
+              }
+          }
       } catch (e) {
           this._log('error', "Flush failed:", e);
       }
   }
 
-  private async _scheduleSave(): Promise<void> {
-    // Flush any pending operations first
+  private async _scheduleSave(): Promise<boolean> {
     this._flushOps();
 
-    // Debounce Logic: Clear existing timer
     if (this._saveTimer) {
         clearTimeout(this._saveTimer);
         this._saveTimer = null;
     }
 
-    // Reuse existing promise if pending
     if (!this._savePromise) {
         this._savePromise = new Promise((resolve, reject) => {
              this._saveResolve = resolve;
@@ -265,32 +253,24 @@ class JSONDatabase extends EventEmitter {
     }
 
     this._saveTimer = setTimeout(async () => {
-      // Ensure flushed again just in case
       this._flushOps();
 
       try {
-         await fs.promises.mkdir(path.dirname(this.filename), { recursive: true });
-
-         // Ensure file exists
-         if (!fs.existsSync(this.filename)) {
-             await fs.promises.writeFile(this.filename, "");
+         const dir = path.dirname(this.filename);
+         if (!fs.existsSync(dir)) {
+             await fs.promises.mkdir(dir, { recursive: true });
          }
 
-         // Acquire Lock
-         const release = await lockfile.lock(this.filename, { retries: 3 });
+         let release = () => {};
+         if (fs.existsSync(this.filename)) {
+             release = await lockfile.lock(this.filename, { retries: 3 });
+         }
          
          try {
-           // Perform Save (Rust Core)
            this.core.save();
-           
-           if (!fs.existsSync(this.filename)) {
-              this._log('error', `[CRITICAL] File missing after save: ${this.filename}`);
-           }
-
            this.emit('write');
-           if (this._saveResolve) this._saveResolve();
+           if (this._saveResolve) this._saveResolve(true);
          } finally {
-           // Release Lock
            await release();
          }
 
@@ -308,33 +288,32 @@ class JSONDatabase extends EventEmitter {
     return this._savePromise;
   }
 
-  public async set(path: string, value: any): Promise<any> {
-    if (!this._loaded) await this._initPromise;
+  public async set(path: string, value: any): Promise<boolean> {
+    await this._ensureInitialized();
     
-    // Middleware Check Optimization
-    if (this._middleware.before.set.length > 0) {
-        let ctx: MiddlewareContext = { path, value };
-        ctx = this._runMiddleware("before", "set", ctx);
-        path = ctx.path;
-        value = ctx.value;
-    }
+    let ctx = { path, value };
+    ctx = this._runMiddleware("before", "set", ctx);
 
     if (this.config.schema) {
-      this._flushOps();
-      // Schema validation...
+      if (this.config.schema.safeParse) {
+          const res = this.config.schema.safeParse({ user: ctx.value });
+          if (!res.success) throw new ValidationError("Schema validation failed", res.error.issues);
+      } else if (typeof this.config.schema === 'function') {
+          if (!this.config.schema(ctx.value)) throw new ValidationError("Schema validation failed");
+      }
     }
 
     if (this.config.indices && this.config.indices.length > 0) {
-        // Targeted unique check instead of full DB clone
         const hasUnique = this.config.indices.some(i => i.unique);
         if (hasUnique) {
             this._flushOps();
             for (const idx of this.config.indices) {
                 if (idx.unique) {
                     const collection = this.core.get(idx.path);
-                    if (Array.isArray(collection)) {
-                        const val = _.get(value, idx.field) || value;
-                        if (collection.some((item: any) => _.get(item, idx.field) === val)) {
+                    if (collection) {
+                        const val = _.get(ctx.value, idx.field) || ctx.value;
+                        const items = Array.isArray(collection) ? collection : Object.values(collection);
+                        if (items.some((item: any) => _.get(item, idx.field) === val)) {
                              throw new Error(`Unique index '${idx.name}' violated for value '${val}'`);
                         }
                     }
@@ -343,60 +322,48 @@ class JSONDatabase extends EventEmitter {
         }
     }
 
-    // Add to Queue
-    this._writeQueue.push({ type: 'set', path, value });
+    this._writeQueue.push({ type: 'set', path: ctx.path, value: ctx.value });
     
-    // We can run 'after' middleware now
-    if (this._middleware.after.set.length > 0) {
-         this._runMiddleware("after", "set", { path, value, finalData: null });
-    }
-
-    // Flush if queue is full
     if (this._writeQueue.length >= this._BATCH_SIZE) {
         this._flushOps();
     }
 
-    this._scheduleSave().catch(() => {}); // Don't await
-    return true;
+    return await this._scheduleSave();
   }
 
   public async get(path?: string, defaultValue: any = null): Promise<any> {
     await this._ensureInitialized();
-    this._flushOps(); // Flush before read
+    this._flushOps(); 
     const val = this.core.get(path || undefined);
     return val === null || val === undefined ? defaultValue : val;
   }
 
   public async has(path: string): Promise<boolean> {
     await this._ensureInitialized();
-    this._flushOps(); // Flush before read
+    this._flushOps(); 
     return this.core.has(path);
   }
 
   public async delete(path: string): Promise<boolean> {
     await this._ensureInitialized();
-    let ctx: MiddlewareContext = { path };
+    let ctx = { path };
     ctx = this._runMiddleware("before", "delete", ctx);
 
-    // Add to Queue
     this._writeQueue.push({ type: 'delete', path: ctx.path });
-
-    this._runMiddleware("after", "delete", { ...ctx });
     
     if (this._writeQueue.length >= this._BATCH_SIZE) {
         this._flushOps();
     }
-    
-    await this._scheduleSave();
-    return true;
+
+    return await this._scheduleSave();
   }
 
-  public async push(path: string, ...items: any[]): Promise<void> {
+  public async push(path: string, ...items: any[]): Promise<boolean | void> {
     await this._ensureInitialized();
-    this._flushOps(); // Flush before read-modify-write
+    this._flushOps(); 
 
     const arr = this.core.get(path);
-    const targetArray = Array.isArray(arr) ? arr : [];
+    const targetArray = Array.isArray(arr) ? _.cloneDeep(arr) : [];
     
     let modified = false;
     items.forEach(item => {
@@ -411,31 +378,34 @@ class JSONDatabase extends EventEmitter {
         if (this._writeQueue.length >= this._BATCH_SIZE) {
             this._flushOps();
         }
-        return await this._scheduleSave().catch(() => {});
+        return await this._scheduleSave();
     }
+    return true;
   }
 
-  public async pull(path: string, ...items: any[]): Promise<void> {
+  public async pull(path: string, ...items: any[]): Promise<boolean | void> {
     await this._ensureInitialized();
-    this._flushOps(); // Flush before read-modify-write
+    this._flushOps(); 
 
     const arr = this.core.get(path);
     if (Array.isArray(arr)) {
-        const initialLen = arr.length;
-        _.pullAllWith(arr, items, _.isEqual);
-        if (arr.length !== initialLen) {
-            this._writeQueue.push({ type: 'set', path: path, value: arr });
+        const copy = _.cloneDeep(arr);
+        const initialLen = copy.length;
+        _.pullAllWith(copy, items, _.isEqual);
+        if (copy.length !== initialLen) {
+            this._writeQueue.push({ type: 'set', path: path, value: copy });
             if (this._writeQueue.length >= this._BATCH_SIZE) {
                 this._flushOps();
             }
-            return this._scheduleSave().catch(() => {});
+            return await this._scheduleSave();
         }
     }
+    return true;
   }
 
-  public async add(path: string, amount: number): Promise<void> {
+  public async add(path: string, amount: number): Promise<boolean> {
     await this._ensureInitialized();
-    this._flushOps(); // Flush before read-modify-write
+    this._flushOps(); 
 
     const current = this.core.get(path) || 0;
     if (typeof current !== 'number') throw new Error(`Value at ${path} is not a number`);
@@ -444,68 +414,44 @@ class JSONDatabase extends EventEmitter {
     if (this._writeQueue.length >= this._BATCH_SIZE) {
         this._flushOps();
     }
-    return this._scheduleSave().catch(() => {});
+    return await this._scheduleSave();
   }
 
-  public async subtract(path: string, amount: number): Promise<void> {
+  public async subtract(path: string, amount: number): Promise<boolean> {
     return this.add(path, -amount);
   }
 
-  /**
-   * Find a single item matching the predicate.
-   * Legacy compatibility.
-   */
   public async find(path: string, predicate: any): Promise<any> {
      await this._ensureInitialized();
-     this._flushOps(); // Flush before read
+     this._flushOps(); 
      if (typeof predicate === 'function') {
-         // JS Predicate
          const collection = this.core.get(path);
          return _.find(collection, predicate);
      } else {
-         // Object predicate - Use Rust for speed if possible, or fallback to lodash if Rust findOne is partial
-         // Rust `findOne` supports mongo-style queries.
-         // If `predicate` is simple object, Rust handles it.
-         // @ts-ignore
          const res = this.core.findOne(path, predicate);
-         // Rust returns Option<Value>, i.e. null or value.
          return res === null ? undefined : res;
      }
   }
 
-  /**
-   * Find by configured index.
-   */
   public async findByIndex(indexName: string, value: any): Promise<any> {
       await this._ensureInitialized();
-      this._flushOps(); // Flush before read
+      this._flushOps(); 
       const idx = this.config.indices.find(i => i.name === indexName);
       if (!idx) throw new Error(`Index with name '${indexName}' does not exist.`);
 
-      // Construct query based on index definition
-      // Index definition: { path: "users", field: "id", ... }
-      // We want to find in "users" where "id" == value.
-      // query: { [idx.field]: value }
-      
       const query = { [idx.field]: value };
-      // @ts-ignore
       const res = this.core.findOne(idx.path, query);
       return res === null ? undefined : res;
   }
 
-  /**
-   * Advanced Query (Returns Cursor).
-   * Replaces legacy `find` for advanced use cases.
-   */
   public query(path: string, query: any): QueryCursor {
       return new QueryCursor(this.core, path, query, this);
   }
 
-  public async transaction(fn: (data: any) => any): Promise<any> {
+  public async transaction(fn: (data: any) => any): Promise<boolean> {
       await this._ensureInitialized();
-      this._flushOps();
+      this._flushOps(); 
       const data = this.core.get(undefined);
-      const backup = _.cloneDeep(data);
       try {
           const mutableClone = _.cloneDeep(data);
           const result = await fn(mutableClone);
@@ -513,21 +459,19 @@ class JSONDatabase extends EventEmitter {
           if (result === undefined) throw new TransactionError("Atomic operation function returned undefined");
           
           this.core.set("", mutableClone);
-          await this._scheduleSave();
-          return result;
+          return await this._scheduleSave();
       } catch (e) {
           throw e;
       }
   }
 
-  public async batch(ops: { type: "set" | "delete" | "push"; path: string; value?: any; values?: any[] }[]): Promise<void> {
+  public async batch(ops: { type: "set" | "delete" | "push"; path: string; value?: any; values?: any[] }[]): Promise<boolean> {
       await this._ensureInitialized();
       this._flushOps();
 
       const rustOps: any[] = [];
       for (const op of ops) {
           if (op.type === 'push') {
-              // Convert push to set
               const current = this.core.get(op.path) || [];
               const target = Array.isArray(current) ? _.cloneDeep(current) : [];
               if (op.values) {
@@ -542,19 +486,19 @@ class JSONDatabase extends EventEmitter {
       }
 
       this.core.batch(rustOps);
-      return this._scheduleSave().catch(() => {});
+      return await this._scheduleSave();
   }
 
-  public async clear(): Promise<void> {
+  public async clear(): Promise<boolean> {
       await this._ensureInitialized();
-      this._writeQueue = [];
+      this._writeQueue = []; 
       this.core.set("", {});
-      return this._scheduleSave().catch(() => {});
+      return await this._scheduleSave();
   }
   
   public async paginate(path: string, page: number = 1, limit: number = 10): Promise<any> {
       await this._ensureInitialized();
-      this._flushOps();
+      this._flushOps(); 
       const items = this.core.get(path);
       if (!Array.isArray(items)) throw new Error("Target is not an array");
 
@@ -570,25 +514,23 @@ class JSONDatabase extends EventEmitter {
   
   public async createSnapshot(label: string = "backup"): Promise<string> {
     await this._ensureInitialized();
-    // Flush to disk first
-    await this._scheduleSave();
+    await this._scheduleSave(); 
     
-    const fs = require('fs').promises;
     const backupName = `${this.filename.replace(".json", "")}.${label}-${Date.now()}.bak`;
-    await fs.copyFile(this.filename, backupName);
+    await fs.promises.copyFile(this.filename, backupName);
     return backupName;
   }
   
   public async close(): Promise<void> {
       if (this._savePromise) await this._savePromise;
-      this._flushOps();
+      this._flushOps(); 
       this.removeAllListeners();
   }
 
-  public before(op: string, pattern: string, cb: MiddlewareFn) {
+  public before(op: 'set' | 'delete' | 'push' | 'pull', pattern: string, cb: MiddlewareFn) {
       this._addM("before", op, pattern, cb);
   }
-  public after(op: string, pattern: string, cb: MiddlewareFn) {
+  public after(op: 'set' | 'delete' | 'push' | 'pull', pattern: string, cb: MiddlewareFn) {
       this._addM("after", op, pattern, cb);
   }
   private _addM(hook: "before" | "after", op: string, pattern: string, cb: MiddlewareFn) {

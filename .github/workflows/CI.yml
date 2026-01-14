@@ -63,6 +63,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        if: ${{ matrix.settings.docker }}
+        uses: docker/setup-qemu-action@v3
+
       - name: Setup node
         uses: actions/setup-node@v4
         if: ${{ !matrix.settings.docker }}
@@ -70,7 +74,7 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         if: ${{ !matrix.settings.docker }}
         with:
@@ -117,11 +121,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -129,7 +128,7 @@ jobs:
           registry-url: https://registry.npmjs.org/
 
       - name: Install dependencies
-        run: bun install
+        run: npm install
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -141,9 +140,6 @@ jobs:
         run: |
           mv artifacts/index.*.node .
           ls -lh *.node
-
-      - name: Build JS from TS
-        run: bun run build:ts
 
       - name: Publish to npm
         run: npm publish --access public
