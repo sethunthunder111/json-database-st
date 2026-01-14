@@ -42,7 +42,7 @@ jobs:
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
             build: |-
               set -e &&
-              npm run build &&
+              npm run build -- --target x86_64-unknown-linux-gnu &&
               strip *.node
           - host: macos-latest
             target: aarch64-apple-darwin
@@ -91,6 +91,7 @@ jobs:
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
 
       - name: Install dependencies
+        if: ${{ !matrix.settings.docker }}
         run: npm install
 
       - name: Build
@@ -100,11 +101,13 @@ jobs:
 
       - name: Build in Docker
         if: ${{ matrix.settings.docker }}
-        run: ${{ matrix.settings.build }}
-        env:
-          CC: ${{ matrix.settings.target }}-gcc
-          CXX: ${{ matrix.settings.target }}-g++
-          LINK: ${{ matrix.settings.target }}-gcc
+        run: |
+          docker run --rm \
+            -v $(pwd):/src \
+            -w /src \
+            -e DEBUG='napi:*' \
+            ${{ matrix.settings.docker }} \
+            /bin/bash -c "${{ matrix.settings.build }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -140,6 +143,9 @@ jobs:
         run: |
           mv artifacts/index.*.node .
           ls -lh *.node
+
+      - name: Build JS from TS
+        run: npm run build:ts
 
       - name: Publish to npm
         run: npm publish --access public
