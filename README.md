@@ -1,65 +1,86 @@
 # JSON Database ST
 
-[![NPM Version](https://badge.fury.io/js/json-database-st.svg)](https://badge.fury.io/js/json-database-st)
-[![NPM Downloads](https://img.shields.io/npm/dm/json-database-st.svg)](https://www.npmjs.com/package/json-database-st)
+> High-performance, lightweight JSON-based database engine for Node.js & Bun.
+> Powered by a **Rust** core for speed and reliability.
+
+[![npm version](https://img.shields.io/npm/v/json-database-st.svg)](https://www.npmjs.com/package/json-database-st)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A high-performance, lightweight, and secure JSON-based database engine for Node.js. Designed for applications that need reliable data persistence, atomic operations, and encryption without the overhead of a full SQL server.
+## 🚀 Features
 
-## 🚀 Key Features
-
-- **🔒 AES-256-GCM Encryption:** Military-grade security for your data at rest.
-- **⚡ O(1) Indexing:** Instant lookups, no matter how big the database gets.
-- **🛡️ Atomic Writes:** Zero corruption risk. Uses lockfiles and temp-write-swap strategy.
-- **🔢 Math Helpers:** Atomic `add` and `subtract` for financial/gaming logic.
-- **📄 Pagination:** Built-in support for handling large lists efficiently.
-- **📸 Snapshots:** One-line command to backup your entire database.
+- **⚡ Blazing Fast:** Core logic written in **Rust** via N-API for native performance.
+- **🛡️ Atomic Operations:** Uses Write-Ahead Logging (WAL) and atomic file swaps to prevent data corruption.
+- **🔍 O(1) Indexing:** In-memory `Map` indices allow for instant lookups by field.
+- **🔒 Encryption:** Optional AES-256-GCM encryption for data at rest.
+- **📦 Zero Dependencies (Runtime):** Self-contained native binary; no heavy external DB servers required.
+- **🔄 Middleware:** Support for `before` and `after` hooks on operations.
+- **💾 JSON Compatible:** Stores data in a simple, portable JSON file.
 
 ## 📦 Installation
 
 ```bash
-npm install json-database-st lodash proper-lockfile
+bun add json-database-st
+# or
+npm install json-database-st
 ```
 
-## ⚡ Quick Start
+## 🛠️ Usage
+
+### Basic Example
 
 ```javascript
-const JSONDatabase = require('json-database-st');
+const { JSONDatabase } = require('json-database-st');
 
-const db = new JSONDatabase('data.json');
+const db = new JSONDatabase('mydb.json', {
+    encryptionKey: 'my-secret-key-123', // Optional: encrypts the file
+    indices: [
+        { name: 'email', path: 'users', field: 'email' } // O(1) lookup index
+    ]
+});
 
-async function run() {
-    // 1. Set Data
-    await db.set('user.name', 'Sethun');
+async function main() {
+    // Write data
+    await db.set('users.u1', {
+        id: 1,
+        name: 'Alice',
+        email: 'alice@example.com'
+    });
+
+    // Read data
+    const user = await db.get('users.u1');
+    console.log(user); 
+    // { id: 1, name: 'Alice', ... }
+
+    // O(1) Lookup by Index
+    const alice = await db.findByIndex('email', 'alice@example.com');
+    console.log(alice); 
+    // { id: 1, name: 'Alice', ... }
     
-    // 2. Atomic Math (New!)
-    await db.set('user.balance', 1000);
-    await db.add('user.balance', 500); // Balance is now 1500
-    
-    // 3. Arrays with Uniqueness
-    await db.push('inventory', { id: 1, item: 'Laptop' });
-    
-    console.log(await db.get('user'));
+    // Atomic Math Operations
+    await db.add('stats.visits', 1);
 }
 
-run();
+main();
 ```
+
+## ⚙️ Configuration
+
+| Option | Type | Default | Description |
+|os|--- |--- |--- |--- |
+| `saveDelay` | `number` | `60` | Debounce time (ms) for writes. Higher = better batching, lower = faster disk commit. |
+| `wal` | `boolean` | `true` | If true, uses Write-Ahead Logging for maximum durability. |
 
 ## 📖 Documentation
 
-Full documentation, API references, and benchmarks are available on the **[Home Page](https://sethunthunder111.github.io/json-database-st/)**.
+Visit our full documentation site: [https://sethunthunder111.github.io/json-database-st/docs.html](https://sethunthunder111.github.io/json-database-st/docs.html)
 
-## 🤝 Contributing
 
-Built by **SethunThunder**.
+## 📊 Benchmarks
 
-## 🚀 Performance (v2.0)
+*Running benchmarks on your local machine...*
 
-| Operation | 10k Records | 1M Records |
-| :--- | :--- | :--- |
-| **Indexed Read** | 0.15 ms | 0.07 ms |
-| **Write (Ingest)** | 42,450 ops/sec | 57,845 ops/sec |
-| **Single Update** | 100 ms | 6.3 s |
+> **Note:** Performance depends heavily on disk I/O speed (SSD recommended).
 
-> **Fastest in Class:** Indexed reads are O(1). Updates are 1.5x faster than v1.0.
-> [View Full Benchmarks](./BENCHMARKS.md)
+## 📄 License
+
+MIT

@@ -1,4 +1,5 @@
-const JSONDatabase = require('./JSONDatabase');
+const JSONDatabaseModule = require('./JSONDatabase');
+const JSONDatabase = JSONDatabaseModule.default || JSONDatabaseModule;
 const fs = require('fs');
 const path = require('path');
 
@@ -96,9 +97,9 @@ async function runAll() {
     const results = [];
     const sizes = [1000, 10000, 100000, 1000000];
     
-    console.log(`${C.cyan}========================================`);
-    console.log(`   🚀 ST DATABASE BENCHMARK SUITE 🚀`);
-    console.log(`========================================${C.reset}\n`);
+    console.log("========================================");
+    console.log("   DATABASE BENCHMARK SUITE");
+    console.log("========================================");
 
     for (const size of sizes) {
         results.push(await runSuite(size));

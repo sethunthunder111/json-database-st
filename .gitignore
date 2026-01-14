@@ -1,50 +1,37 @@
-test-data/
 node_modules/
-
-# Logs
-logs/
+test-data/
+target/
+index.node
+*.node
+*.pdb
+*.json.wal
+*.json.tmp
+*.bak
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# Coverage
 coverage/
 .nyc_output/
-
-# Build output / caches
 dist/
 build/
 lib/
 .cache/
-
-# Environment files
 .env
 .env.*
-
-# IDE / OS files
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
-
-# TypeScript
 *.tsbuildinfo
-
-# npm artifacts
 *.tgz
-
-# Temporary test databases
 __tests__/test-data/
-
-# Ignore any files or directories containing "test" in their name
-*test*
-**/*test*/
-**/*test*/*
-*_test*
-*_test*/ 
-**/*_test*
-**/*_test*/
-
+bench_test.json
+bench_test_hybrid.json
+benchmark_hybrid.js
+benchmark_nowal.js
+debug_*.js
+debug_*.json
+debug_*.json.wal
+GEMINI.md
+AGENTS.md

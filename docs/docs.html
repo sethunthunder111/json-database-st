@@ -1,289 +1,597 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en" class="antialiased">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Documentation | json-database-st</title>
+    <title>Documentation | JSONDB v3</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Prism (Syntax Highlighting) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600&family=Fira+Code&display=swap" rel="stylesheet">
+    
+    <!-- Smooth Scroll -->
+    <script src="https://unpkg.com/@studio-freight/lenis@1.0.33/dist/lenis.min.js"></script>
+
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #050505; color: #d4d4d4; }
-        h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; color: white; }
-        
-        /* Clean Code Blocks */
-        pre { border-radius: 8px; border: 1px solid rgba(255,255,255,0.08) !important; background: #0a0a0a !important; padding: 1.5rem !important; }
-        
+        :root { 
+            --accent: #ccff00; 
+            --bg: #050505;
+            --surface: #0a0a0a;
+            --border: #262626;
+            --text-main: #e5e5e5;
+            --text-muted: #a3a3a3;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg);
+            background-image: 
+                radial-gradient(circle at 50% 0%, #1f1f1f 0%, transparent 70%),
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            color: var(--text-main);
+        }
+
+        /* Typography Override */
+        h1, h2, h3, h4, .font-display { font-family: 'Space Grotesk', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Navbar */
+        nav.top-nav { 
+            background: rgba(5, 5, 5, 0.7); 
+            backdrop-filter: blur(12px); 
+            border-bottom: 1px solid var(--border); 
+        }
+
         /* Sidebar */
-        .sidebar-link { display: block; padding: 6px 0; color: #737373; transition: all 0.2s; border-left: 2px solid transparent; padding-left: 1rem; font-size: 0.9rem; }
-        .sidebar-link:hover { color: #e5e5e5; border-left-color: #525252; }
-        .sidebar-link.active { color: #fbbf24; border-left-color: #fbbf24; font-weight: 500; }
+        aside { 
+            border-right: 1px solid var(--border); 
+            height: calc(100vh - 80px); 
+            top: 80px; 
+            background: rgba(5,5,5,0.5); /* slight transparency */
+        }
         
-        /* Typography */
-        .api-method { font-family: 'Fira Code', monospace; color: #fbbf24; font-size: 1.1rem; }
-        .badge { padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; }
-        .badge-new { background: rgba(234, 179, 8, 0.2); color: #eab308; }
+        .nav-header { 
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600; 
+            color: white; 
+            margin-top: 2rem; 
+            margin-bottom: 0.75rem; 
+            padding-left: 1rem; 
+            text-transform: uppercase; 
+            font-size: 0.75rem; 
+            letter-spacing: 0.1em; 
+            color: var(--text-muted);
+        }
+        
+        .nav-link { 
+            display: block; 
+            padding: 0.4rem 1rem 0.4rem 1.5rem; 
+            color: var(--text-muted); 
+            font-size: 0.9rem; 
+            transition: all 0.2s;
+            border-left: 2px solid transparent;
+        }
+        
+        .nav-link:hover { 
+            color: white; 
+            background: rgba(255,255,255,0.03); 
+        }
+        
+        .nav-link.active { 
+            color: var(--accent); 
+            background: rgba(204, 255, 0, 0.05); 
+            border-left-color: var(--accent);
+            font-weight: 500;
+        }
+
+        /* Content Typography */
+        h1 { 
+            font-size: clamp(3.5rem, 6vw, 5rem); 
+            line-height: 0.95; 
+            letter-spacing: -0.03em; 
+            font-weight: 700; 
+            background: linear-gradient(to bottom right, #fff, #aaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        h2 { 
+            font-size: 2rem; 
+            margin-top: 4rem; 
+            margin-bottom: 1.5rem; 
+            padding-bottom: 0.5rem; 
+            border-bottom: 1px solid var(--border); 
+            color: white; 
+            letter-spacing: -0.02em; 
+            display: flex;
+            align-items: center;
+        }
+        
+        h2::before {
+            content: '#';
+            color: var(--accent);
+            margin-right: 0.5rem;
+            font-family: 'Space Grotesk';
+            opacity: 0.5;
+            font-size: 1.5rem;
+        }
+
+        h3 { 
+            font-size: 1.25rem; 
+            margin-top: 2.5rem; 
+            margin-bottom: 1rem; 
+            color: white; 
+            font-family: 'JetBrains Mono', monospace;
+            display: inline-block;
+            background: #1a1a1a;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        
+        p { 
+            color: var(--text-muted); 
+            line-height: 1.7; 
+            margin-bottom: 1.5rem; 
+            max-width: 70ch; 
+            font-size: 1.05rem; 
+        }
+        
+        strong { color: white; font-weight: 600; }
+        
+        /* Code Blocks */
+        .code-wrapper { 
+            position: relative; 
+            margin: 1.5rem 0 2.5rem 0; 
+            border: 1px solid var(--border); 
+            border-radius: 8px; 
+            background: #080808; 
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        /* Mac-style dots header for code blocks */
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #111;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .code-dots {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+        
+        .lang-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: #555;
+            text-transform: uppercase;
+        }
+
+        pre { margin: 0 !important; padding: 1.25rem !important; background: transparent !important; border: none !important; }
+        code { font-family: 'JetBrains Mono', monospace !important; font-size: 0.875rem !important; line-height: 1.6 !important; }
+        
+        /* Copy Button */
+        .copy-btn {
+            background: transparent; 
+            color: #666; 
+            border: 1px solid #333;
+            padding: 0.2rem 0.6rem; 
+            font-family: 'Inter', sans-serif; 
+            font-size: 0.7rem; 
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer; 
+            transition: all 0.2s;
+        }
+        .copy-btn:hover { background: #222; color: white; border-color: #555; }
+        .copy-btn.copied { color: var(--accent); border-color: var(--accent); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        /* Selection */
+        ::selection { background: rgba(204, 255, 0, 0.2); color: var(--accent); }
     </style>
 </head>
-<body class="flex flex-col md:flex-row min-h-screen">
+<body class="antialiased selection:bg-[#ccff00] selection:text-black">
 
-    <!-- Left Sidebar -->
-    <aside class="w-full md:w-72 bg-black border-r border-white/5 p-8 md:fixed md:h-screen overflow-y-auto z-20 scrollbar-hide">
-        <div class="mb-10">
-            <a href="index.html" class="text-lg font-bold text-white tracking-tight hover:text-yellow-500 transition">
-                &larr; Back to Home
+    <!-- Top Navbar -->
+    <nav class="top-nav fixed w-full z-50 h-20 flex items-center justify-between px-6 md:px-10">
+        <a href="index.html" class="flex items-center gap-2 group">
+            <div class="font-display font-bold text-xl tracking-tight text-white group-hover:text-[#ccff00] transition-colors">
+                JSONDB<span class="text-[#ccff00]">_v3</span>
+            </div>
+        </a>
+        <div class="hidden md:flex gap-8 font-mono text-sm tracking-wide text-gray-400">
+            <a href="index.html" class="hover:text-white transition-colors">HOME</a>
+            <a href="benchmarks.html" class="hover:text-white transition-colors">BENCHMARKS</a>
+            <a href="https://github.com/sethunthunder111/json-database-st" class="hover:text-white transition-colors flex items-center gap-2">
+                GITHUB
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
             </a>
         </div>
-        <nav class="space-y-1">
-            <p class="text-xs font-bold text-white uppercase tracking-widest mb-3 mt-6 opacity-40">Introduction</p>
-            <a href="#install" class="sidebar-link">Installation</a>
-            <a href="#init" class="sidebar-link">Initialization</a>
-            <a href="benchmarks.html" class="sidebar-link">Benchmarks</a>
+    </nav>
+
+    <div class="flex pt-20">
+        <!-- Sidebar -->
+        <aside class="w-64 fixed overflow-y-auto hidden md:block scrollbar-hide z-40">
+            <nav class="px-4 py-8 pb-32" id="sidebar-nav">
+                <div class="nav-header">Start</div>
+                <a href="#install" class="nav-link">Installation</a>
+                <a href="#quickstart" class="nav-link">Quick Start</a>
+                <a href="#hybrid" class="nav-link">Hybrid Mode</a>
+
+                <div class="nav-header">Core API</div>
+                <a href="#set" class="nav-link">set / get / has</a>
+                <a href="#delete" class="nav-link">delete</a>
+                <a href="#arrays" class="nav-link">push / pull</a>
+                <a href="#math" class="nav-link">add / subtract</a>
+
+                <div class="nav-header">Querying</div>
+                <a href="#indices" class="nav-link">findByIndex (O1)</a>
+                <a href="#query" class="nav-link">query (Cursor)</a>
+                <a href="#find" class="nav-link">find (Legacy)</a>
+                <a href="#paginate" class="nav-link">paginate</a>
+
+                <div class="nav-header">Advanced</div>
+                <a href="#batch" class="nav-link">batch</a>
+                <a href="#transaction" class="nav-link">transaction</a>
+                <a href="#snapshots" class="nav-link">createSnapshot</a>
+                <a href="#middleware" class="nav-link">Middleware</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 md:ml-64 p-6 md:p-16 lg:p-24 min-h-screen relative z-0">
             
-            <p class="text-xs font-bold text-white uppercase tracking-widest mb-3 mt-6 opacity-40">Core API</p>
-            <a href="#basic" class="sidebar-link">get / set / has</a>
-            <a href="#delete" class="sidebar-link">delete</a>
-            <a href="#arrays" class="sidebar-link">push / pull</a>
-            <a href="#math" class="sidebar-link">add / subtract <span class="badge badge-new">v2</span></a>
-            
-            <p class="text-xs font-bold text-white uppercase tracking-widest mb-3 mt-6 opacity-40">Querying</p>
-            <a href="#find" class="sidebar-link">find</a>
-            <a href="#indices" class="sidebar-link">findByIndex (Fast)</a>
-            <a href="#pagination" class="sidebar-link">paginate <span class="badge badge-new">v2</span></a>
-            
-            <p class="text-xs font-bold text-white uppercase tracking-widest mb-3 mt-6 opacity-40">Advanced</p>
-            <a href="#middleware" class="sidebar-link">Middleware Hooks</a>
-            <a href="#schema" class="sidebar-link">Schema Validation</a>
-            <a href="#events" class="sidebar-link">Events</a>
-            <a href="#snapshots" class="sidebar-link">Snapshots</a>
-        </nav>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="flex-1 md:ml-72 p-8 md:p-20 max-w-5xl">
-        
-        <div class="mb-16">
-            <h1 class="text-5xl font-bold mb-6">Documentation</h1>
-            <p class="text-lg text-gray-500 leading-relaxed">
-                Complete reference for `json-database-st`. <br>
-                Everything you need to store data safely in Node.js.
-            </p>
-        </div>
-
-        <!-- Installation -->
-        <section id="install" class="mb-20">
-            <h2 class="text-3xl font-bold mb-6 text-white">Installation</h2>
-            <div class="bg-[#0a0a0a] border border-white/10 rounded-lg p-4 flex items-center justify-between">
-                <code class="text-yellow-500 font-mono">npm install json-database-st lodash proper-lockfile</code>
-            </div>
-        </section>
-
-        <!-- Init -->
-        <section id="init" class="mb-20">
-            <h2 class="text-3xl font-bold mb-6 text-white">Initialization</h2>
-            <pre><code class="language-javascript">const JSONDatabase = require('json-database-st');
-const path = require('path');
-
-const db = new JSONDatabase(path.join(__dirname, 'db.json'), {
-    // Optional Configuration
-    encryptionKey: process.env.KEY, // 32-byte hex string
-    prettyPrint: true,              // Format JSON for readability
-    saveDelay: 50,                  // Debounce writes (ms)
-    indices: [                      // Speed up lookups
-        { name: 'email', path: 'users', field: 'email' }
-    ]
-});</code></pre>
-        </section>
-
-        <!-- Basic Ops -->
-        <section id="basic" class="mb-20">
-            <h2 class="text-3xl font-bold mb-8 text-white">Basic Operations</h2>
-            
-            <div class="mb-10">
-                <h3 class="api-method mb-2">set(path, value)</h3>
-                <p class="text-gray-400 mb-3">Writes data to the path. Creates nested objects if they don't exist.</p>
-                <pre><code class="language-javascript">await db.set('app.name', 'My App');
-await db.set('users.1', { name: 'John', age: 25 });</code></pre>
+            <div class="mb-32 mt-10 max-w-4xl">
+                <div class="inline-block px-3 py-1 border border-[#ccff00]/30 rounded-full bg-[#ccff00]/10 text-[#ccff00] font-mono text-xs mb-6">
+                    LATEST RELEASE v3.1.0
+                </div>
+                <h1>DOCS<span class="text-[#ccff00]">.</span></h1>
+                <p class="text-xl md:text-2xl font-light text-gray-400 mt-6 leading-relaxed">
+                    The definitive guide to <span class="text-white font-medium">json-database-st</span>.
+                    High-performance, transactional, and type-safe data persistence for Node.js.
+                </p>
             </div>
 
-            <div class="mb-10">
-                <h3 class="api-method mb-2">get(path, defaultValue)</h3>
-                <p class="text-gray-400 mb-3">Retrieves data. Returns `defaultValue` if the path is missing.</p>
-                <pre><code class="language-javascript">const name = await db.get('users.1.name');
-const role = await db.get('users.1.role', 'guest'); // default to guest</code></pre>
-            </div>
+            <div class="max-w-3xl">
+                <section id="install">
+                    <h2>Installation</h2>
+                    <div class="code-wrapper">
+                        <pre><code class="language-bash">npm install json-database-st lodash proper-lockfile</code></pre>
+                    </div>
+                </section>
 
-            <div class="mb-10">
-                <h3 class="api-method mb-2">has(path)</h3>
-                <p class="text-gray-400 mb-3">Checks if a key exists in the database.</p>
-                <pre><code class="language-javascript">if (await db.has('users.1')) {
-    console.log('User exists!');
-}</code></pre>
-            </div>
-        </section>
+                <section id="quickstart">
+                    <h2>Quick Start</h2>
+                    <p>Initialize the database. If the file doesn't exist, it will be created automatically.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">const JSONDatabase = require('json-database-st');
 
-        <!-- Delete -->
-        <section id="delete" class="mb-20">
-            <h2 class="text-3xl font-bold mb-6 text-white">Deletion</h2>
-            <h3 class="api-method mb-2">delete(path)</h3>
-            <p class="text-gray-400 mb-3">Removes a key or object from the database permanently.</p>
-            <pre><code class="language-javascript">// Remove a specific field
-await db.delete('users.1.age');
+// Initialize (Auto-creates file if missing)
+const db = new JSONDatabase('db.json');
 
-// Remove an entire object
-await db.delete('users.1');</code></pre>
-        </section>
+// Write
+await db.set('user.1', { name: 'Alice', role: 'admin' });
 
-        <!-- Arrays -->
-        <section id="arrays" class="mb-20">
-            <h2 class="text-3xl font-bold mb-8 text-white">Array Methods</h2>
-            
-            <div class="mb-10">
-                <h3 class="api-method mb-2">push(path, ...items)</h3>
-                <p class="text-gray-400 mb-3">Adds items to an array. <strong>Deeply checks for duplicates</strong> before adding.</p>
-                <pre><code class="language-javascript">await db.push('admins', 'user1', 'user2');
-// Won't add 'user1' again if it exists</code></pre>
-            </div>
+// Read
+const user = await db.get('user.1');</code></pre>
+                    </div>
+                </section>
 
-            <div class="mb-10">
-                <h3 class="api-method mb-2">pull(path, ...items)</h3>
-                <p class="text-gray-400 mb-3">Removes items from an array using deep comparison.</p>
-                <pre><code class="language-javascript">await db.pull('admins', 'user2');</code></pre>
-            </div>
-        </section>
+                <section id="hybrid">
+                    <h2>Hybrid Architecture</h2>
+                    <p>v3 offers two storage consistency modes. Choose based on your durability needs.</p>
+                    <div class="grid md:grid-cols-2 gap-6 my-10">
+                        <div class="border border-zinc-800 p-6 rounded-lg hover:border-[#ccff00] transition-colors bg-[#0a0a0a] group">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 mb-4 text-zinc-500 group-hover:text-[#ccff00] transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse></svg>
+                            <div class="text-[#ccff00] font-bold font-mono text-lg mb-2 group-hover:translate-x-1 transition-transform">MODE: DURABLE</div>
+                            <p class="text-sm mb-4 text-zinc-400">Writes are appended to a WAL file immediately. Crash-safe.</p>
+                            <div class="code-wrapper mb-0 !mt-0 !border-zinc-800">
+                                <pre><code class="language-javascript">new JSONDatabase('db', { 
+  wal: true 
+})</code></pre>
+                            </div>
+                        </div>
+                        <div class="border border-zinc-800 p-6 rounded-lg hover:border-[#ccff00] transition-colors bg-[#0a0a0a] group">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 mb-4 text-zinc-500 group-hover:text-[#ccff00] transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
+                            <div class="text-[#ccff00] font-bold font-mono text-lg mb-2 group-hover:translate-x-1 transition-transform">MODE: IN-MEMORY</div>
+                            <p class="text-sm mb-4 text-zinc-400">Max throughput (~90k ops/sec). Writes update RAM instantly, disk periodically.</p>
+                            <div class="code-wrapper mb-0 !mt-0 !border-zinc-800">
+                                <pre><code class="language-javascript">new JSONDatabase('db', { 
+  wal: false 
+})</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
-        <!-- Math -->
-        <section id="math" class="mb-20">
-            <h2 class="text-3xl font-bold mb-8 text-white">Atomic Math</h2>
-            <p class="text-gray-400 mb-4">Atomic calculations. Safer than read-modify-write loops.</p>
-            
-            <pre><code class="language-javascript">await db.set('visits', 100);
+                <!-- CORE API -->
+                <section id="set">
+                    <h2>Basic Operations</h2>
+                    
+                    <h3>set(path, value)</h3>
+                    <p>Writes data. Creates nested paths automatically.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">await db.set('config.theme', 'dark');
+await db.set('users.1.settings.notifications', true);</code></pre>
+                    </div>
 
-// Atomic Increment
-await db.add('visits', 1);
+                    <h3>get(path, defaultValue?)</h3>
+                    <p>Retrieves data. Returns `defaultValue` if path doesn't exist.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">const val = await db.get('config.theme', 'light');</code></pre>
+                    </div>
 
-// Atomic Decrement
-await db.subtract('visits', 10);</code></pre>
-        </section>
+                    <h3>has(path)</h3>
+                    <p>Checks existence. High performance.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">if (await db.has('users.1')) { ... }</code></pre>
+                    </div>
+                </section>
 
-        <!-- Find -->
-        <section id="find" class="mb-20">
-            <h2 class="text-3xl font-bold mb-6 text-white">Find (Scan)</h2>
-            <h3 class="api-method mb-2">find(path, predicate)</h3>
-            <p class="text-gray-400 mb-3">Scans an array or object to find a matching element. Uses Lodash syntax.</p>
-            <pre><code class="language-javascript">// Find user where age is 25
-const user = await db.find('users', { age: 25 });
+                <section id="delete">
+                    <h2>Delete</h2>
+                    <h3>delete(path)</h3>
+                    <p>Removes a key or object property.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">await db.delete('users.1.settings'); // Delete nested property
+await db.delete('users.1');          // Delete entire object</code></pre>
+                    </div>
+                </section>
 
-// Find using a function
-const active = await db.find('users', u => u.isActive === true);</code></pre>
-        </section>
+                <section id="arrays">
+                    <h2>Arrays</h2>
+                    
+                    <h3>push(path, ...items)</h3>
+                    <p>Adds items to an array. <strong>Dedupes</strong> automatically.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">await db.push('users.1.tags', 'premium', 'beta');</code></pre>
+                    </div>
 
-        <!-- Indices -->
-        <section id="indices" class="mb-20">
-            <h2 class="text-3xl font-bold mb-6 text-white">Find By Index (O1)</h2>
-            <p class="text-gray-400 mb-4">For large datasets, use this instead of `find`. It uses a Hash Map for instant results.</p>
-            <pre><code class="language-javascript">// 1. Setup
-const db = new JSONDatabase('db.json', {
-    indices: [{ name: 'user_email', path: 'users', field: 'email' }]
+                    <h3>pull(path, ...items)</h3>
+                    <p>Removes items from an array (deep equality).</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">await db.pull('users.1.tags', 'beta');</code></pre>
+                    </div>
+                </section>
+
+                <section id="math">
+                    <h2>Math</h2>
+                    <h3>add(path, amount)</h3>
+                    <p>Atomic increment.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">await db.add('users.1.loginCount', 1);</code></pre>
+                    </div>
+
+                    <h3>subtract(path, amount)</h3>
+                    <p>Atomic decrement.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">await db.subtract('users.1.credits', 50);</code></pre>
+                    </div>
+                </section>
+
+                <!-- QUERYING -->
+                <section id="indices">
+                    <h2>Indices (Fast Lookups)</h2>
+                    <p>Define indices in the constructor for O(1) read performance.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">const db = new JSONDatabase('db.json', {
+    indices: [{ name: 'email', path: 'users', field: 'email' }]
 });
 
-// 2. Fast Lookup
-const user = await db.findByIndex('user_email', 'john@example.com');</code></pre>
-        </section>
+// Instant Lookup
+const user = await db.findByIndex('email', 'alice@corp.com');</code></pre>
+                    </div>
+                </section>
 
-        <!-- Pagination -->
-        <section id="pagination" class="mb-20">
-            <h2 class="text-3xl font-bold mb-6 text-white">Pagination <span class="badge badge-new">v2</span></h2>
-            <p class="text-gray-400 mb-4">Retrieve data in chunks. Essential for large lists or API endpoints.</p>
-            <pre><code class="language-javascript">// Fetch Page 1 (10 items per page)
-const result = await db.paginate('users', 1, 10);
+                <section id="query">
+                    <h2>Advanced Query Cursor</h2>
+                    <p>Chainable query builder for filtering, sorting, and selecting fields.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">const results = await db.query('users')
+    .limit(10)
+    .skip(0)
+    .sort({ age: -1 }) // Descending
+    .select(['id', 'name', 'email'])
+    .exec();</code></pre>
+                    </div>
+                </section>
 
-console.log(result.data); // Array of users
-console.log(result.meta); 
-/* 
-{ 
-  total: 50, 
-  page: 1, 
-  limit: 10, 
-  totalPages: 5, 
-  hasNext: true 
-} 
-*/</code></pre>
-        </section>
+                <section id="find">
+                    <h2>Find (Legacy)</h2>
+                    <p>Simple scan operation. Useful for small datasets or ad-hoc queries.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">const user = await db.find('users', u => u.age > 18);
+// OR
+const user = await db.find('users', { role: 'admin' });</code></pre>
+                    </div>
+                </section>
 
-        <!-- Middleware -->
-        <section id="middleware" class="mb-20">
-            <h2 class="text-3xl font-bold mb-6 text-white">Middleware Hooks</h2>
-            <p class="text-gray-400 mb-4">Intercept operations. Supported hooks: `before`, `after`. Supported methods: `set`, `delete`, `push`, `pull`.</p>
-            <pre><code class="language-javascript">// Add timestamp before saving any user
-db.before('set', 'users.*', (context) => {
-    context.value.updatedAt = Date.now();
-    return context; // Must return context
+                <section id="paginate">
+                    <h2>Paginate</h2>
+                    <p>Helper for API endpoints.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">const page = await db.paginate('users', 1, 20);
+// Returns: { data: [...], meta: { total, pages, ... } }</code></pre>
+                    </div>
+                </section>
+
+                <!-- ADVANCED -->
+                <section id="batch">
+                    <h2>Batch Operations</h2>
+                    <p>Execute multiple writes in a single IO tick. Extremely fast.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">await db.batch([
+    { type: 'set', path: 'logs.1', value: 'log data' },
+    { type: 'delete', path: 'temp.cache' }
+]);</code></pre>
+                    </div>
+                </section>
+
+                <section id="transaction">
+                    <h2>Transactions</h2>
+                    <p>Atomic read-modify-write. The database is locked during execution.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">await db.transaction(async (data) => {
+    if (data.bank.balance >= 100) {
+        data.bank.balance -= 100;
+        data.users.1.wallet += 100;
+    }
+    // Returns modified state automatically
+    return data;
 });</code></pre>
-        </section>
+                    </div>
+                </section>
 
-        <!-- Schema -->
-        <section id="schema" class="mb-20">
-            <h2 class="text-3xl font-bold mb-6 text-white">Schema Validation</h2>
-            <pre><code class="language-javascript">const { z } = require('zod');
+                <section id="snapshots">
+                    <h2>Snapshots</h2>
+                    <p>Create a backup of the current state.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">const backupPath = await db.createSnapshot('daily');
+console.log('Backup saved to:', backupPath);</code></pre>
+                    </div>
+                </section>
 
-const db = new JSONDatabase('db.json', { 
-    schema: z.object({
-        // your zod schema here
-    }) 
+                <section id="middleware">
+                    <h2>Middleware</h2>
+                    <p>Intercept operations before they happen.</p>
+                    <div class="code-wrapper">
+                        <pre><code class="language-javascript">db.before('set', 'users.*', (ctx) => {
+    ctx.value.updatedAt = Date.now();
+    return ctx;
 });</code></pre>
-        </section>
+                    </div>
+                </section>
+            </div>
 
-        <!-- Events -->
-        <section id="events" class="mb-20">
-            <h2 class="text-3xl font-bold mb-6 text-white">Events</h2>
-            <p class="text-gray-400 mb-4">The database extends NodeJS EventEmitter.</p>
-            <pre><code class="language-javascript">db.on('ready', () => console.log('Database loaded!'));
+            <footer class="border-t border-zinc-800 mt-32 pt-10 pb-20 text-gray-500 font-mono text-sm flex flex-col md:flex-row justify-between gap-4">
+                <span>&copy; 2025 JSONDB Project. Released under MIT License.</span>
+                <span class="text-[#ccff00]">v3.1.0</span>
+            </footer>
 
-db.on('change', (data) => {
-    console.log('Data changed:', data);
-});
-
-db.on('write', () => console.log('Data saved to disk.'));</code></pre>
-        </section>
-
-        <!-- Snapshots -->
-        <section id="snapshots" class="mb-24">
-            <h2 class="text-3xl font-bold mb-6 text-white">Backups (Snapshots)</h2>
-            <p class="text-gray-400 mb-4">Create a manual copy of the database file instantly.</p>
-            <pre><code class="language-javascript">const path = await db.createSnapshot('daily-backup');
-console.log(`Backup saved to: ${path}`);</code></pre>
-        </section>
-
-        <footer class="border-t border-white/10 pt-12 text-gray-500 text-sm">
-            <p>&copy; 2025 json-database-st. MIT License.</p>
-        </footer>
-
-    </main>
-
-    <!-- Table of Contents (Right) -->
-    <aside class="hidden xl:block w-64 p-8 fixed right-0 top-0 h-screen overflow-y-auto border-l border-white/5">
-        <h5 class="text-xs font-bold text-white uppercase tracking-widest mb-4 mt-6 opacity-40">Contents</h5>
-        <ul class="space-y-2 text-xs text-gray-500">
-            <li><a href="#basic" class="hover:text-yellow-500 transition">Basic Operations</a></li>
-            <li><a href="#delete" class="hover:text-yellow-500 transition">Deletion</a></li>
-            <li><a href="#arrays" class="hover:text-yellow-500 transition">Array Methods</a></li>
-            <li><a href="#math" class="hover:text-yellow-500 transition">Math Helpers</a></li>
-            <li><a href="#find" class="hover:text-yellow-500 transition">Find / Search</a></li>
-            <li><a href="#indices" class="hover:text-yellow-500 transition">Indexing</a></li>
-            <li><a href="#pagination" class="hover:text-yellow-500 transition">Pagination</a></li>
-            <li><a href="#events" class="hover:text-yellow-500 transition">Events</a></li>
-            <li><a href="#snapshots" class="hover:text-yellow-500 transition">Backups</a></li>
-        </ul>
-
-        <div class="mt-12 p-4 bg-white/5 rounded border border-white/10">
-            <p class="text-white font-bold text-xs mb-1">Maintained by</p>
-            <a href="https://instagram.com/sethunthunder" class="text-yellow-500 text-xs hover:underline">@sethunthunder</a>
-        </div>
-    </aside>
+        </main>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    
+    <script>
+        const lenis = new Lenis()
+        function raf(time) {
+            lenis.raf(time)
+            requestAnimationFrame(raf)
+        }
+        requestAnimationFrame(raf)
+
+        // Enhance Code Blocks
+        document.querySelectorAll('pre').forEach((pre) => {
+            const wrapper = pre.parentElement;
+            if(!wrapper.classList.contains('code-wrapper')) return;
+            
+            // Get language
+            let lang = 'TEXT';
+            const codeClass = pre.querySelector('code').className;
+            if(codeClass.includes('javascript')) lang = 'JS';
+            else if(codeClass.includes('bash')) lang = 'BASH';
+            else if(codeClass.includes('json')) lang = 'JSON';
+
+            // Create Header
+            const header = document.createElement('div');
+            header.className = 'code-header';
+            header.innerHTML = `
+                <div class="code-dots">
+                    <div class="dot dot-red"></div>
+                    <div class="dot dot-yellow"></div>
+                    <div class="dot dot-green"></div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="lang-label">${lang}</span>
+                    <button class="copy-btn">COPY</button>
+                </div>
+            `;
+            
+            // Insert header before pre
+            wrapper.insertBefore(header, pre);
+            
+            // Copy Logic
+            const button = header.querySelector('.copy-btn');
+            button.addEventListener('click', () => {
+                const code = pre.querySelector('code').innerText;
+                navigator.clipboard.writeText(code);
+                
+                const originalText = button.innerText;
+                button.innerText = 'COPIED';
+                button.classList.add('copied');
+                
+                setTimeout(() => {
+                    button.innerText = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            });
+        });
+
+        // Scroll Spy & Sidebar Logic
+        const sections = document.querySelectorAll("section");
+        const navLinks = document.querySelectorAll(".nav-link");
+        const sidebar = document.querySelector('aside');
+        
+        let activeSectionId = '';
+
+        window.addEventListener("scroll", () => {
+            let current = "";
+            sections.forEach((section) => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (window.scrollY >= sectionTop - 250) {
+                    current = section.getAttribute("id");
+                }
+            });
+
+            if(current !== activeSectionId) {
+                activeSectionId = current;
+                
+                navLinks.forEach((link) => {
+                    link.classList.remove("active");
+                    if (link.getAttribute("href").includes(current)) {
+                        link.classList.add("active");
+                        
+                        // Auto-scroll sidebar to keep active link in view
+                        const linkRect = link.getBoundingClientRect();
+                        const sidebarRect = sidebar.getBoundingClientRect();
+                        
+                        // Check if link is outside viewable area of sidebar
+                        if (linkRect.top < sidebarRect.top + 50 || linkRect.bottom > sidebarRect.bottom - 50) {
+                            link.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>

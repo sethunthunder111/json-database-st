@@ -1,7 +1,9 @@
-const JSONDatabase = require('../JSONDatabase');
-const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
+const fs = require('fs').promises;
+
+const JSONDatabaseModule = require('../JSONDatabase');
+const JSONDatabase = JSONDatabaseModule.default || JSONDatabaseModule;
 
 // --- Test Setup ---
 const TEST_DATA_DIR = path.join(__dirname, 'test-data');

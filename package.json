@@ -1,12 +1,17 @@
 {
   "name": "json-database-st",
-  "version": "2.0.03",
-  "description": "A simple, promise-based JSON file database for Node.js with atomic operations and lodash integration.",
+  "version": "3.1.0",
+  "description": "High-performance JSON database with Rust core, ACID compliance (WAL), and MongoDB-style queries.",
   "main": "JSONDatabase.js",
+  "module": "JSONDatabase.ts",
   "types": "JSONDatabase.d.ts",
   "scripts": {
     "test": "jest",
-    "benchmark": "node benchmark.js"
+    "benchmark": "node benchmark.js",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "build:ts": "bun build JSONDatabase.ts --outfile JSONDatabase.js --target node --format cjs --external ./index",
+    "build:all": "bun run build && bun run build:ts"
   },
   "repository": {
     "type": "git",
@@ -40,11 +45,19 @@
   },
   "files": [
     "JSONDatabase.js",
+    "JSONDatabase.d.ts",
+    "JSONDatabase.legacy.js",
+    "index.js",
+    "index.d.ts",
+    "*.node",
     "LICENSE",
-    "README.md",
-    "JSONDatabase.d.ts"
+    "README.md"
   ],
   "devDependencies": {
+    "@napi-rs/cli": "^3.5.1",
     "jest": "^30.1.1"
+  },
+  "napi": {
+    "binaryName": "index"
   }
 }
