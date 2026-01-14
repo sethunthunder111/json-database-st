@@ -1,17 +1,27 @@
 import { EventEmitter } from 'events';
 
+export interface IndexConfig {
+  name: string;
+  path: string;
+  field: string;
+  unique?: boolean;
+}
+
 export interface DatabaseOptions {
   encryptionKey?: string;
   saveDelay?: number;
   prettyPrint?: boolean;
+  silent?: boolean;
+  wal?: boolean;
   schema?: any;
+  indices?: IndexConfig[];
 }
 
 export interface MiddlewareContext {
   path: string;
   value?: any;
   finalData?: any;
-  data?: any;
+  [key: string]: any;
 }
 
 export type MiddlewareFn = (ctx: MiddlewareContext) => MiddlewareContext;
@@ -19,34 +29,8 @@ export type MiddlewareFn = (ctx: MiddlewareContext) => MiddlewareContext;
 export class DBError extends Error {}
 export class TransactionError extends DBError {}
 export class ValidationError extends DBError {
-  issues: any[];
-  constructor(msg: string, issues: any[]);
-}
-
-export default class JSONDatabase extends EventEmitter {
-  constructor(filename: string, options?: DatabaseOptions);
-  
-  get(path?: string, defaultValue?: any): any;
-  has(path: string): boolean;
-  set(path: string, value: any): Promise<void>;
-  delete(path: string): Promise<boolean>;
-  
-  push(path: string, ...items: any[]): Promise<void>;
-  pull(path: string, ...items: any[]): Promise<void>;
-  
-  add(path: string, amount: number): Promise<void>;
-  subtract(path: string, amount: number): Promise<void>;
-  
-  find(path: string, query: any): QueryCursor;
-  findOne(path: string, query: any): any;
-  
-  transaction<T = any>(fn: (data: any) => T | Promise<T>): Promise<T>;
-  batch(ops: Array<{ type: 'set' | 'delete'; path: string; value?: any }>): Promise<void>;
-  
-  clear(): Promise<void>;
-  
-  before(op: string, pattern: string, cb: MiddlewareFn): void;
-  after(op: string, pattern: string, cb: MiddlewareFn): void;
+  issues?: any[];
+  constructor(msg: string, issues?: any[]);
 }
 
 export class QueryCursor implements PromiseLike<any[]> {
@@ -59,4 +43,45 @@ export class QueryCursor implements PromiseLike<any[]> {
     onfulfilled?: ((value: any[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
   ): PromiseLike<TResult1 | TResult2>;
+}
+
+export default class JSONDatabase extends EventEmitter {
+  static DBError: typeof DBError;
+  static TransactionError: typeof TransactionError;
+  static ValidationError: typeof ValidationError;
+  static QueryCursor: typeof QueryCursor;
+
+  constructor(filename: string, options?: DatabaseOptions);
+  
+  get<T = any>(path?: string, defaultValue?: T): Promise<T>;
+  has(path: string): Promise<boolean>;
+  set(path: string, value: any): Promise<boolean>;
+  delete(path: string): Promise<boolean>;
+  
+  push(path: string, ...items: any[]): Promise<boolean | void>;
+  pull(path: string, ...items: any[]): Promise<boolean | void>;
+  
+  add(path: string, amount: number): Promise<boolean>;
+  subtract(path: string, amount: number): Promise<boolean>;
+  
+  find<T = any>(path: string, predicate: ((item: T) => boolean) | object): Promise<T | undefined>;
+  findByIndex<T = any>(indexName: string, value: any): Promise<T | undefined>;
+  
+  query(path: string, query?: any): QueryCursor;
+  
+  transaction<T = any>(fn: (data: any) => T | Promise<T>): Promise<boolean>;
+  batch(ops: Array<{ type: 'set' | 'delete' | 'push'; path: string; value?: any; values?: any[] }>): Promise<boolean>;
+  
+  clear(): Promise<boolean>;
+  
+  paginate<T = any>(path: string, page?: number, limit?: number): Promise<{
+    data: T[];
+    meta: { total: number; page: number; limit: number; totalPages: number; hasNext: boolean };
+  }>;
+  
+  createSnapshot(label?: string): Promise<string>;
+  close(): Promise<void>;
+
+  before(op: 'set' | 'delete' | 'push' | 'pull', pattern: string, cb: MiddlewareFn): void;
+  after(op: 'set' | 'delete' | 'push' | 'pull', pattern: string, cb: MiddlewareFn): void;
 }
