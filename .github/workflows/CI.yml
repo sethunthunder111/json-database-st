@@ -42,6 +42,7 @@ jobs:
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
             build: |-
               set -e &&
+              rustup default stable &&
               npm run build -- --target x86_64-unknown-linux-gnu &&
               strip *.node
           - host: macos-latest
@@ -54,6 +55,7 @@ jobs:
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
             build: |-
               set -e &&
+              rustup default stable &&
               npm run build -- --target aarch64-unknown-linux-gnu &&
               aarch64-unknown-linux-gnu-strip *.node
 
@@ -105,6 +107,7 @@ jobs:
             -v $(pwd):/src \
             -w /src \
             -e DEBUG='napi:*' \
+            -e HOME=/tmp \
             ${{ matrix.settings.docker }} \
             /bin/bash -c "${{ matrix.settings.build }}"
 
