@@ -35,3 +35,5 @@ debug_*.json
 debug_*.json.wal
 GEMINI.md
 AGENTS.md
+conductor/
+__tests__/
