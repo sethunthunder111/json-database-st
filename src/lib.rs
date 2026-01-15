@@ -26,7 +26,7 @@ pub struct DatabaseCore {
     data: Arc<RwLock<Value>>,
     filename: PathBuf,
     wal_path: PathBuf,
-    wal_file: Arc<Mutex<BufWriter<fs::File>>>,
+    wal_file: Option<Arc<Mutex<BufWriter<fs::File>>>>,
     encryption_key: Option<Vec<u8>>,
     pretty_print: bool,
     use_wal: bool,
@@ -43,6 +43,7 @@ impl DatabaseCore {
     ) -> Result<Self> {
         let path = PathBuf::from(filename);
         let wal_path = path.with_extension("wal");
+        let should_use_wal = use_wal.unwrap_or(true);
 
         let key_bytes = encryption_key
             .map(|k| {
@@ -60,22 +61,27 @@ impl DatabaseCore {
             }
         }
 
-        let wal_file_raw = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&wal_path)
-            .map_err(|e| {
-                Error::new(Status::GenericFailure, format!("Failed to open WAL: {}", e))
-            })?;
+        let wal_file = if should_use_wal {
+            let wal_file_raw = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&wal_path)
+                .map_err(|e| {
+                    Error::new(Status::GenericFailure, format!("Failed to open WAL: {}", e))
+                })?;
+            Some(Arc::new(Mutex::new(BufWriter::new(wal_file_raw))))
+        } else {
+            None
+        };
 
         let db = DatabaseCore {
             data: Arc::new(RwLock::new(Value::Object(serde_json::Map::new()))),
             filename: path,
             wal_path,
-            wal_file: Arc::new(Mutex::new(BufWriter::new(wal_file_raw))),
+            wal_file,
             encryption_key: key_bytes,
             pretty_print: pretty_print.unwrap_or(true),
-            use_wal: use_wal.unwrap_or(true),
+            use_wal: should_use_wal,
         };
 
         Ok(db)
@@ -251,35 +257,37 @@ impl DatabaseCore {
     }
 
     fn append_wal(&self, op: &Operation) -> Result<()> {
-        let mut wal_file = self.wal_file.lock();
+        if let Some(wal_file_arc) = &self.wal_file {
+            let mut wal_file = wal_file_arc.lock();
 
-        let output = if let Some(key) = &self.encryption_key {
-            let json_string = serde_json::to_string(op).unwrap();
-            let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
-            let mut iv = [0u8; 12];
-            OsRng.fill_bytes(&mut iv);
-            let nonce = Nonce::from_slice(&iv);
-            let ciphertext_with_tag = cipher
-                .encrypt(nonce, json_string.as_bytes())
-                .map_err(|_| Error::from_status(Status::GenericFailure))?;
-            let tag_len = 16;
-            let split_idx = ciphertext_with_tag.len() - tag_len;
-            let ciphertext = &ciphertext_with_tag[..split_idx];
-            let tag = &ciphertext_with_tag[split_idx..];
+            let output = if let Some(key) = &self.encryption_key {
+                let json_string = serde_json::to_string(op).unwrap();
+                let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
+                let mut iv = [0u8; 12];
+                OsRng.fill_bytes(&mut iv);
+                let nonce = Nonce::from_slice(&iv);
+                let ciphertext_with_tag = cipher
+                    .encrypt(nonce, json_string.as_bytes())
+                    .map_err(|_| Error::from_status(Status::GenericFailure))?;
+                let tag_len = 16;
+                let split_idx = ciphertext_with_tag.len() - tag_len;
+                let ciphertext = &ciphertext_with_tag[..split_idx];
+                let tag = &ciphertext_with_tag[split_idx..];
 
-            let wrapper = serde_json::json!({
-                "iv": hex::encode(iv),
-                "content": hex::encode(ciphertext),
-                "tag": hex::encode(tag)
-            });
-            serde_json::to_vec(&wrapper)?
-        } else {
-            serde_json::to_vec(op)?
-        };
+                let wrapper = serde_json::json!({
+                    "iv": hex::encode(iv),
+                    "content": hex::encode(ciphertext),
+                    "tag": hex::encode(tag)
+                });
+                serde_json::to_vec(&wrapper)?
+            } else {
+                serde_json::to_vec(op)?
+            };
 
-        wal_file.write_all(&output)?;
-        wal_file.write_all(b"\n")?;
-        // wal_file.flush()?; // REMOVED FOR PERFORMANCE: BufWriter will flush when needed or on save()
+            wal_file.write_all(&output)?;
+            wal_file.write_all(b"\n")?;
+            // wal_file.flush()?; // REMOVED FOR PERFORMANCE: BufWriter will flush when needed or on save()
+        }
         Ok(())
     }
 
@@ -323,19 +331,21 @@ impl DatabaseCore {
         fs::rename(&tmp_path, &self.filename)?;
 
         // Truncate WAL
-        let mut wal_file = self.wal_file.lock();
-        let wal_raw = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&self.wal_path)
-            .map_err(|e| {
-                Error::new(
-                    Status::GenericFailure,
-                    format!("Failed to truncate WAL: {}", e),
-                )
-            })?;
-        *wal_file = BufWriter::new(wal_raw);
+        if let Some(wal_file_arc) = &self.wal_file {
+            let mut wal_file = wal_file_arc.lock();
+            let wal_raw = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&self.wal_path)
+                .map_err(|e| {
+                    Error::new(
+                        Status::GenericFailure,
+                        format!("Failed to truncate WAL: {}", e),
+                    )
+                })?;
+            *wal_file = BufWriter::new(wal_raw);
+        }
 
         Ok(())
     }
@@ -430,34 +440,36 @@ impl DatabaseCore {
 
         {
             if self.use_wal {
-                let mut wal_file = self.wal_file.lock();
-                if let Some(key) = &self.encryption_key {
-                    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
-                    for op in &operations {
-                        let json_string = serde_json::to_string(op).unwrap();
-                        let mut iv = [0u8; 12];
-                        OsRng.fill_bytes(&mut iv);
-                        let nonce = Nonce::from_slice(&iv);
-                        let ciphertext_with_tag = cipher
-                            .encrypt(nonce, json_string.as_bytes())
-                            .map_err(|_| Error::from_status(Status::GenericFailure))?;
-                        let tag_len = 16;
-                        let split_idx = ciphertext_with_tag.len() - tag_len;
-                        let ciphertext = &ciphertext_with_tag[..split_idx];
-                        let tag = &ciphertext_with_tag[split_idx..];
+                if let Some(wal_file_arc) = &self.wal_file {
+                    let mut wal_file = wal_file_arc.lock();
+                    if let Some(key) = &self.encryption_key {
+                        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
+                        for op in &operations {
+                            let json_string = serde_json::to_string(op).unwrap();
+                            let mut iv = [0u8; 12];
+                            OsRng.fill_bytes(&mut iv);
+                            let nonce = Nonce::from_slice(&iv);
+                            let ciphertext_with_tag = cipher
+                                .encrypt(nonce, json_string.as_bytes())
+                                .map_err(|_| Error::from_status(Status::GenericFailure))?;
+                            let tag_len = 16;
+                            let split_idx = ciphertext_with_tag.len() - tag_len;
+                            let ciphertext = &ciphertext_with_tag[..split_idx];
+                            let tag = &ciphertext_with_tag[split_idx..];
 
-                        let wrapper = serde_json::json!({
-                            "iv": hex::encode(iv),
-                            "content": hex::encode(ciphertext),
-                            "tag": hex::encode(tag)
-                        });
-                        serde_json::to_writer(&mut *wal_file, &wrapper)?;
-                        wal_file.write_all(b"\n")?;
-                    }
-                } else {
-                    for op in &operations {
-                        serde_json::to_writer(&mut *wal_file, op)?;
-                        wal_file.write_all(b"\n")?;
+                            let wrapper = serde_json::json!({
+                                "iv": hex::encode(iv),
+                                "content": hex::encode(ciphertext),
+                                "tag": hex::encode(tag)
+                            });
+                            serde_json::to_writer(&mut *wal_file, &wrapper)?;
+                            wal_file.write_all(b"\n")?;
+                        }
+                    } else {
+                        for op in &operations {
+                            serde_json::to_writer(&mut *wal_file, op)?;
+                            wal_file.write_all(b"\n")?;
+                        }
                     }
                 }
             }
@@ -662,73 +674,87 @@ fn set_value_by_path(root: &mut Value, path: &str, value: Value) {
 
     let mut current = root;
     for (i, part) in parts.iter().enumerate() {
-        if i == parts.len() - 1 {
-            match current {
-                Value::Object(map) => {
-                    map.insert(part.to_string(), value);
-                }
-                Value::Array(arr) => {
-                    if let Ok(idx) = part.parse::<usize>() {
-                        if idx < arr.len() {
-                            arr[idx] = value;
-                        } else if idx == arr.len() {
-                            arr.push(value);
-                        }
-                    }
-                }
-                _ => {}
-            }
-            return;
-        }
+        let is_last = i == parts.len() - 1;
 
-        let is_next_array = parts[i + 1].parse::<usize>().is_ok();
-
+        // 1. Handle Array/Object auto-creation if current is not a container
         if !current.is_object() && !current.is_array() {
-            *current = if is_next_array {
+            // Determine next container type based on the *next* part (if available)
+            // or if it's the last part, we just need a container for *this* key.
+            // But if we are overwriting a scalar, 'current' is effectively the parent of the thing we are setting?
+            // Wait, no. 'current' IS the container we are traversing INTO.
+            // If i=0, part="user", current=root. root is Object.
+            // If user doesn't exist, we insert "user".
+            // The logic below handles *replacing* a scalar current with a container.
+
+            let next_part_is_index = if !is_last {
+                parts[i + 1].parse::<usize>().is_ok()
+            } else {
+                // If we are at the last part, e.g. set("a.b", val).
+                // Processing "b". If "b" is numeric, we might want "a" to be array.
+                // But we are ALREADY at "a". 'current' is "a".
+                // If "a" is scalar, we must replace it.
+                // If "b" is "1", "a" should become Array?
+                // Lodash says yes.
+                part.parse::<usize>().is_ok()
+            };
+
+            *current = if next_part_is_index {
                 Value::Array(Vec::new())
             } else {
                 Value::Object(serde_json::Map::new())
             };
         }
 
-        let need_insert = match current {
-            Value::Object(map) => !map.contains_key(*part),
-            Value::Array(arr) => {
-                let idx = part.parse::<usize>().unwrap_or(0);
-                idx >= arr.len()
-            }
-            _ => false,
-        };
-
-        if need_insert {
-            let new_obj = if is_next_array {
-                Value::Array(Vec::new())
-            } else {
-                Value::Object(serde_json::Map::new())
-            };
-            match current {
-                Value::Object(map) => {
-                    map.insert(part.to_string(), new_obj);
-                }
-                Value::Array(arr) => {
-                    let idx = part.parse::<usize>().unwrap_or(0);
-                    if idx == arr.len() {
-                        arr.push(new_obj);
-                    }
-                }
-                _ => {}
-            }
-        }
-
+        // 2. Perform the Set (if last) or Ensure Child Exists (if not last)
         match current {
             Value::Object(map) => {
-                current = map.get_mut(*part).unwrap();
+                if is_last {
+                    map.insert(part.to_string(), value);
+                    return;
+                } else {
+                    if !map.contains_key(*part) {
+                        // Decide child type
+                        let next_is_array = parts[i + 1].parse::<usize>().is_ok();
+                        let new_child = if next_is_array {
+                            Value::Array(Vec::new())
+                        } else {
+                            Value::Object(serde_json::Map::new())
+                        };
+                        map.insert(part.to_string(), new_child);
+                    }
+                    // Traverse
+                    current = map.get_mut(*part).unwrap();
+                }
             }
             Value::Array(arr) => {
-                let idx = part.parse::<usize>().unwrap_or(0);
-                if idx < arr.len() {
-                    current = arr.get_mut(idx).unwrap();
+                if let Ok(idx) = part.parse::<usize>() {
+                    // Expand array if needed
+                    while arr.len() <= idx {
+                        arr.push(Value::Null);
+                    }
+
+                    if is_last {
+                        arr[idx] = value;
+                        return;
+                    } else {
+                        // Ensure child exists (if it was Null from padding, replace it)
+                        if arr[idx].is_null() {
+                            let next_is_array = parts[i + 1].parse::<usize>().is_ok();
+                            let new_child = if next_is_array {
+                                Value::Array(Vec::new())
+                            } else {
+                                Value::Object(serde_json::Map::new())
+                            };
+                            arr[idx] = new_child;
+                        }
+                        // Traverse
+                        current = arr.get_mut(idx).unwrap();
+                    }
                 } else {
+                    // Non-numeric index on Array -> Do nothing (or convert to Object?)
+                    // Lodash would technically treat the array as an object and add the property "foo".
+                    // But serde_json::Value::Array is strictly a list. We can't turn it into an Object without losing array semantics or data?
+                    // For now, we return, keeping existing behavior for invalid array access.
                     return;
                 }
             }
