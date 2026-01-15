@@ -6,6 +6,8 @@
 [![npm version](https://img.shields.io/npm/v/json-database-st.svg)](https://www.npmjs.com/package/json-database-st)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+> **WARNING:** This library currently only works on **macOS** and **Windows**. Linux support is temporarily unavailable.
+
 ## 🚀 Features
 
 - **⚡ Blazing Fast:** Core logic written in **Rust** via N-API for native performance.
