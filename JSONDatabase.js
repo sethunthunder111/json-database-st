@@ -126,6 +126,7 @@ class JSONDatabase extends EventEmitter {
     this._loaded = false;
     this._writeQueue = [];
     this._BATCH_SIZE = 1000;
+    this._performSaveBound = this._performSave.bind(this);
 
     this._initPromise = this._initialize();
   }
@@ -172,10 +173,14 @@ class JSONDatabase extends EventEmitter {
       
       try {
           this.core.batch(ops);
-          for (const op of ops) {
-              if (this._middleware.after[op.type] && this._middleware.after[op.type].length > 0) {
-                  const { type, ...rest } = op;
-                  this._runMiddleware("after", type, { ...rest, finalData: this.core.get(undefined) });
+          
+          const hasAfter = Object.values(this._middleware.after).some(arr => arr.length > 0);
+          if (hasAfter) {
+              for (const op of ops) {
+                  if (this._middleware.after[op.type] && this._middleware.after[op.type].length > 0) {
+                      const { type, ...rest } = op;
+                      this._runMiddleware("after", type, { ...rest, finalData: this.core.get(undefined) });
+                  }
               }
           }
       } catch (e) {
@@ -183,22 +188,7 @@ class JSONDatabase extends EventEmitter {
       }
   }
 
-  async _scheduleSave() {
-    // this._flushOps(); // REMOVED: Batching optimization. Flush only on read or before save.
-
-    if (this._saveTimer) {
-        clearTimeout(this._saveTimer);
-        this._saveTimer = null;
-    }
-
-    if (!this._savePromise) {
-        this._savePromise = new Promise((resolve, reject) => {
-             this._saveResolve = resolve;
-             this._saveReject = reject;
-        });
-    }
-
-    this._saveTimer = setTimeout(async () => {
+  async _performSave() {
       this._flushOps();
 
       try {
@@ -229,14 +219,40 @@ class JSONDatabase extends EventEmitter {
          this._saveResolve = null;
          this._saveReject = null;
       }
-    }, this.config.saveDelay);
+  }
+
+  _scheduleSave() {
+    // this._flushOps(); // REMOVED: Batching optimization. Flush only on read or before save.
+
+    if (this._saveTimer) {
+        clearTimeout(this._saveTimer);
+        this._saveTimer = null;
+    }
+
+    if (!this._savePromise) {
+        this._savePromise = new Promise((resolve, reject) => {
+             this._saveResolve = resolve;
+             this._saveReject = reject;
+        });
+    }
+
+    this._saveTimer = setTimeout(this._performSaveBound, this.config.saveDelay);
 
     return this._savePromise;
   }
 
-  async set(path, value) {
-    await this._ensureInitialized();
-    
+  set(path, value) {
+    try {
+        if (!this._loaded) {
+            return this._initPromise.then(() => this._setSync(path, value));
+        }
+        return this._setSync(path, value);
+    } catch (e) {
+        return Promise.reject(e);
+    }
+  }
+
+  _setSync(path, value) {
     let ctx = { path, value };
     ctx = this._runMiddleware("before", "set", ctx);
 
@@ -274,7 +290,7 @@ class JSONDatabase extends EventEmitter {
         this._flushOps();
     }
 
-    return await this._scheduleSave();
+    return this._scheduleSave();
   }
 
   async get(path, defaultValue = null) {

@@ -42,41 +42,6 @@ jobs:
             build: |
               npm run build -- --target aarch64-apple-darwin
               strip -x *.node
-          - host: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
-            build: |-
-              set -e &&
-              npm run build -- --target x86_64-unknown-linux-gnu &&
-              strip index.linux-x64-gnu.node
-          - host: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
-            build: |-
-              set -e &&
-              npm run build -- --target aarch64-unknown-linux-gnu &&
-              aarch64-linux-gnu-strip index.linux-arm64-gnu.node
-          - host: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-alpine
-            build: |-
-              set -e &&
-              npm run build -- --target x86_64-unknown-linux-musl &&
-              strip index.linux-x64-musl.node
-          - host: ubuntu-latest
-            target: aarch64-unknown-linux-musl
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-alpine-aarch64
-            build: |-
-              set -e &&
-              npm run build -- --target aarch64-unknown-linux-musl &&
-              aarch64-linux-musl-strip index.linux-arm64-musl.node
-          - host: ubuntu-latest
-            target: armv7-unknown-linux-gnueabihf
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-armv7
-            build: |-
-              set -e &&
-              npm run build -- --target armv7-unknown-linux-gnueabihf &&
-              arm-linux-gnueabihf-strip index.linux-arm-gnueabihf.node
 
     name: build - ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
