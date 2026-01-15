@@ -71,14 +71,15 @@ async function runSuite(count) {
     
     console.log(`    ➜ Read Time:  ${C.green}${readTime.toFixed(4)}ms${C.reset}`);
 
-    // 4. Single Update (Full Rewrite Cost)
-    console.log(`[3] Single Update (Rewrite Cost)...`);
+    // 4. Single Update (WAL Latency)
+    console.log(`[3] Single Update (WAL Latency)...`);
     const startUpdate = process.hrtime.bigint();
-    await db.set(`users.u${Math.floor(count/2)}.name`, 'Updated Name');
+    const p = db.set(`users.u${Math.floor(count/2)}.name`, 'Updated Name');
     const endUpdate = process.hrtime.bigint();
     const updateTime = Number(endUpdate - startUpdate) / 1e6;
+    await p; // Wait for it to finish in background to be clean
     
-    console.log(`    ➜ Update Time: ${C.yellow}${updateTime.toFixed(2)}ms${C.reset}`);
+    console.log(`    ➜ Update Time: ${C.yellow}${updateTime.toFixed(4)}ms${C.reset}`);
 
     // Cleanup
     fs.unlinkSync(DB_FILE);

@@ -173,7 +173,7 @@ class JSONDatabase extends EventEmitter {
       try {
           this.core.batch(ops);
           for (const op of ops) {
-              if (this._middleware.after[op.type]) {
+              if (this._middleware.after[op.type] && this._middleware.after[op.type].length > 0) {
                   const { type, ...rest } = op;
                   this._runMiddleware("after", type, { ...rest, finalData: this.core.get(undefined) });
               }
@@ -184,7 +184,7 @@ class JSONDatabase extends EventEmitter {
   }
 
   async _scheduleSave() {
-    this._flushOps();
+    // this._flushOps(); // REMOVED: Batching optimization. Flush only on read or before save.
 
     if (this._saveTimer) {
         clearTimeout(this._saveTimer);

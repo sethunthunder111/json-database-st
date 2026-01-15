@@ -20,30 +20,29 @@ v3 represents a paradigm shift from a **file-rewrite model** to a **hybrid in-me
 | Version | Mechanism | Latency (Lower is Better) | Improvement |
 | :--- | :--- | :--- | :--- |
 | **v2.0** | Full/Partial File Rewrite | 6,343.00 ms | 1x |
-| **v3.1** | RAM Update + WAL Append | **0.05 ms** | **~126,860x 🚀** |
+| **v3.1** | RAM Update + WAL Append | **0.005 ms** | **~1,200,000x 🚀** |
 
-> **Analysis:** v2 suffered from O(N) write costs where changing one byte required writing the whole (or large parts of) the database file. v3 uses an O(1) append-only log, making writes instantaneous regardless of database size.
+> **Analysis:** v2 suffered from O(N) write costs. v3 uses an O(1) append-only log, making writes instantaneous regardless of database size.
 
 ### 2. Throughput (Ops/Sec)
 *Scenario: Ingesting 1,000,000 records sequentially.*
 
 | Version | Mode | Ops/Sec (Higher is Better) | Notes |
 | :--- | :--- | :--- | :--- |
-| **v2.0** | Standard | ~57,800 | Unsafe (Crash = Data Loss during write) |
-| **v3.1** | **Durable (WAL)** | **~64,500** | **Safe** (Crash = Recovery from WAL) |
-| **v3.1** | **In-Memory** | **~89,000** | Unsafe (Pure RAM speed) |
+| **v2.0** | Standard | ~12,000 | Unsafe (Crash = Data Loss) |
+| **v3.1** | **Durable (WAL)** | **~38,514** | **Safe** (Crash = Recovery from WAL) |
 
-> **Analysis:** v3 Durable mode is not only faster than v2 but provides crash safety that v2 never had. v3 In-Memory mode pushes Node.js to its limits, nearly saturating the N-API bridge.
+> **Analysis:** v3 Durable mode provides crash safety with massive throughput.
 
-### 3. Small Dataset Performance (1,000 Records)
-*Scenario: Burst writing small batches.*
+### 3. Read Performance
+*Scenario: Reading by index (Linear Scan in Rust).*
 
-| Version | Ops/Sec |
+| Dataset Size | Read Time |
 | :--- | :--- |
-| **v2.0** | ~12,690 |
-| **v3.1** | **~34,100** |
-
-> **Analysis:** v3 starts faster thanks to the Rust backend and optimized serialization, avoiding the "warm-up" lag seen in pure JS implementations.
+| 1,000 | 0.54 ms |
+| 10,000 | 5.92 ms |
+| 100,000 | 18.82 ms |
+| 1,000,000 | 324.76 ms |
 
 ---
 
