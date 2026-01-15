@@ -139,7 +139,9 @@ jobs:
 
       - name: Publish to npm
         run: |
-          npm adduser
+          npm adduser || true
+          echo "Waiting 60 seconds for browser login to complete..."
+          sleep 60
           npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
