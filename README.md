@@ -1,4 +1,6 @@
-# JSON Database ST
+# JSON Database ST [DEPRECATED]
+
+> **⚠️ DEPRECATED:** This project is no longer maintained and will not receive any further updates.
 
 > High-performance, lightweight JSON-based database engine for Node.js & Bun.
 > Powered by a **Rust** core for speed and reliability.
